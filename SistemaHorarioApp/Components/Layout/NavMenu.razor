@@ -1,0 +1,52 @@
+﻿<div class="top-row ps-3 navbar navbar-light" style="background-color:#fff; border-bottom:1px solid #cecece;">
+    <div class="container-fluid">
+        <div class="card-logo">
+            <RadzenImage Path="@($"/favicon.png")"
+                         Style="width: 27px; height: 27px; flex-shrink:0;"
+                         class="rz-border-radius-2"
+                          />
+        <a class="navbar-brand">Academia</a>
+        </div>
+    </div>
+</div>
+
+@* <RadzenButton Icon="menu" class="navbar-toggler"></RadzenButton> *@
+<input type="checkbox" title="Navigation menu" class="navbar-toggler"/>
+
+<div class="nav-scrollable" style="border-right:1px solid #cecece; background-color:white;" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/page/home" Match="NavLinkMatch.All">
+                <span class="material-symbols-outlined">
+                    home
+                </span>
+                Inicio
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/page/horario-fijo" Match="NavLinkMatch.All">
+                <span class="material-symbols-outlined">
+                    article
+                </span> Fijo
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/page/horario-variable">
+                <span class="material-symbols-outlined">
+                    fact_check
+                </span> Variable
+            </NavLink>
+        </div>
+@*         <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/page/data">
+                <span class="material-symbols-outlined">
+                    <span class="material-symbols-outlined">
+                        assignment
+                    </span>
+                </span> Reportes
+            </NavLink>
+        </div> *@
+    </nav>
+</div>
+

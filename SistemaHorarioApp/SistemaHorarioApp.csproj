@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>d9cbb9fb-771b-4f0e-8872-8853d6ddcbb3</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="Components\Pages\HorarioFijo.razor" />
+    <Content Remove="Components\Pages\ListadoHorarioColaborador.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SistemaHorario.Application\SistemaHorario.Application.csproj" />
+    <ProjectReference Include="..\SistemaHorario.Infrastructure\SistemaHorario.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Components\Consolidados\Por Area\" />
+    <Folder Include="Components\Pages\Admin\" />
+    <Folder Include="Dialog\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CurrieTechnologies.Razor.SweetAlert2" Version="5.6.0" />
+    <PackageReference Include="Radzen.Blazor" Version="11.4.0" />
+  </ItemGroup>
+
+</Project>

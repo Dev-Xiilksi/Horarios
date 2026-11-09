@@ -1,0 +1,143 @@
+﻿@page "/page/obtener-consolidados"
+@attribute [Authorize(Roles = $"{RolesSistema.Consultor},{RolesSistema.Administrador}")]
+@using Microsoft.AspNetCore.Authorization
+@using SistemaHorarioApp.Components.Tables
+@inject NavigationManager _nav
+@inject IReporteService _reporteService
+@inject IAreaService _areaServ
+@inject ISender _sender
+<RadzenCard>
+    <h2>Data</h2>
+    <div class="mb-3 d-heaader">
+        <div class="mb-3">
+            @* <RadzenButton Style="background-color:#CC1243;font-weight: bolder;font-size: 0.7rem;" Click="@(() => OpenDialog(0))" Text="Agregar colaborador" /> *@
+        </div>
+    </div>
+
+    <RadzenCard>
+        <div class="d-header">
+            <input type="text" value=""  placeholder="Ciclo"/>
+            <RadzenButton Icon="search" Style="font-weight:300;" Click="() => ObtenerAreasPorCiclo()"></RadzenButton>
+            <select class="select" name="cars" id="cars">
+                <option value="" disabled selected hidden>Tipo de listado</option>
+                <option value="area">Area</option>
+                <option value="educador">Educador</option>
+                <option value="fijo">Horario Fijo</option>
+                <option value="variable">Horario Variable</option>
+            </select>
+
+            <button class="btn-obtenerdatos">Obtener todos los datos</button>
+        </div>
+
+    </RadzenCard>
+</RadzenCard>
+
+<TableToGeneralUse T="AreaDTO"
+                      Items="@areas"
+                   FilterSelector="@(x => $"{x.Nombre} {x.TotalPorArea}")">
+
+    <HeaderTemplate>
+        <tr>
+            <th>Area</th>
+            <th>Cantidad de registros</th>
+            <th> </th>
+        </tr>
+    </HeaderTemplate>
+
+    <RowTemplate Context="item">
+        <tr>
+            <td>@item.Nombre</td>
+            <td>@item.TotalPorArea</td>
+            <td>
+                <RadzenButton Icon="get_app" Text="Obtener excel" Style="font-weight:300;background-color:#217346; border-radius: 8px;cursor: pointer; color:#fff;" Click="() => DescargarExcelData(item)">
+                </RadzenButton>
+                <RadzenButton Icon="visibility" Style="background: #CC1243; color:#fff; font-weight:300;border-radius: 8px;" Text="Ir al area" Click="() => Goto(item.Código, item.Areas, ciclo)" />
+            </td>
+        </tr>
+    </RowTemplate>
+</TableToGeneralUse>
+
+@code {
+    Variant variant = Variant.Outlined;
+    private string ciclo = DateTime.Now.Year.ToString();
+    private bool _jsLoaded = false;
+    private string area = string.Empty;
+    private int countHours = 0;
+    private List<AreaDTO> areas = new List<AreaDTO>();
+    private object groupbyareas { get; set; }
+    private AreaDTO obj = new()
+        {
+            Ciclo = DateTime.Now.Year.ToString()
+        };
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerAreas();
+
+    }
+
+    /******ObtenerAreas******/
+    private async Task ObtenerAreas()
+    {
+        var response = await _areaServ.GetAreasWithTotalHrs(ciclo);
+        if (response.Any())
+        {
+            areas = response;
+        }
+    }
+    /******ObtenerAreasPorCiclo******/
+    private async Task ObtenerAreasPorCiclo()
+    {
+        var response = await _areaServ.GetAreasWithTotalHrs(ciclo);
+        if(response.Count != 0)
+        {
+            areas = response;
+        }
+    }
+
+    private async Task DescargarExcelData(AreaDTO obj)
+    {
+        obj.Ciclo = ciclo;
+        await _reporteService.GenerateExcelWithCustomHeadersAsync(obj);
+        if (!_jsLoaded)
+        {
+            return;
+        }
+    }
+    private async Task Goto(string Codigo, int Id,string ciclo)
+    {
+        if (!string.IsNullOrEmpty(Codigo))
+        {
+            string id = Id.ToString();
+            _nav.NavigateTo($"/area/{Codigo}/{id}/{ciclo}");
+        }
+    }
+    /******Carga los datos del educadores por area para mostrar cuantos tienen ya registrosn******/
+    private async Task GetCount(string area)
+    {
+        try
+        {
+            var op = await _sender.Send(new ObtenerHorariosQuery(ciclo));
+            groupbyareas = op
+                .GroupBy(x => x.Area)
+                .Select(g => new
+                {
+                    Area = g.Key,
+                    Horarios = g.ToList(),
+                    Total = g.Count()
+                })
+                .ToList();
+        }
+        catch (Exception)
+        {
+
+            throw;
+        }
+    }
+
+    class Groupbyarea
+    {
+        public int area { get; set; }
+        public int total { get; set; }
+        public List<HrHorario1DTO> horararios { get; set; }
+    }
+}

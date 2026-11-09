@@ -1,0 +1,325 @@
+﻿@page "/page/area"
+@attribute [Authorize(Roles = $"{RolesSistema.Administrador},{RolesSistema.Consultor}")]
+@using Microsoft.AspNetCore.Authorization
+@using SistemaHorarioApp.Components.Charts.Donuts
+@inject ISender _sender
+@inject IDataToChartsService _dataToChar
+@inject IAccesoUsuarioService _accesoServ
+@inject IReporteService _reportServ
+@inject IExcelHorarioService ExcelHorarioService
+@inject IJSRuntime _jsruntime
+@inject SweetAlertService _swal
+<!-- ===================== CABECERA ===================== -->
+<RadzenCard Style="margin-bottom:12px; background-color:#fff;">
+    <RadzenStack Orientation="Orientation.Horizontal"
+                 AlignItems="AlignItems.Center"
+                 JustifyContent="JustifyContent.SpaceBetween"
+                 Wrap="FlexWrap.Wrap"
+                 class="rz-p-0 rz-p-md-0 rz-mb-0 rz-border-radius-1 header-stack">
+                
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Center" Gap="1rem" class="rz-p-2 rz-p-md-4">
+            <RadzenStack Gap="2">
+                <RadzenText Style="color:#000;" TextStyle="TextStyle.Body1"><b>@(acceso.FullName) @((idCoordinador))</b></RadzenText>
+                <RadzenText Style="color:#000;" TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-2 rz-my-0">@acceso.AreaName, @acceso.RolName</RadzenText><br />
+                <RadzenButton Click="() => DescargarExcelConsolidados()">Obtener consolidados</RadzenButton>
+            </RadzenStack>
+        </RadzenStack>
+
+        <div class="photo-employee">
+            <img src="@($"/employees/{@idCoordinador}.jpg")" alt="@idCoordinador"
+                 onerror="this.src='/employees/profile-picture.png'"
+                 class="photo-employee-img" />
+        </div>
+    </RadzenStack>
+</RadzenCard>
+
+<!-- ===================== TARJETAS RESUMEN ===================== -->
+<div class="summary-grid rz-mb-3">
+    <RadzenCard class="summary-card">
+        <div class="summary-icon-label">
+            <RadzenIcon Icon="people"></RadzenIcon>
+        </div>
+        <div class="summary-label">Educadores</div>
+        <div class="summary-value" style="color:#1a73e8;">@CantidadEducadores</div>
+    </RadzenCard>
+            
+    <RadzenCard class="summary-card">
+        <div class="summary-icon-label">
+            <RadzenIcon Icon="av_timer"></RadzenIcon>
+        </div>
+        <div class="summary-label">Horas lectivas</div>
+        <div class="summary-value" style="color:#28a745;">@Math.Round(TotalHorasLectivas, 2)%</div>
+    </RadzenCard>
+
+    <RadzenCard class="summary-card">
+        <div class="summary-icon-label">
+            <RadzenIcon Icon="av_timer"></RadzenIcon>
+        </div>
+        <div class="summary-label">Horas no lectivas</div>
+        <div class="summary-value" style="color:#EF5C38;">@Math.Round(TotalHorasNoLectivas, 2)%</div>
+    </RadzenCard>
+
+    <RadzenCard class="ssummary-card">
+        <HomeDonutChart totalHorasLectivas="@Math.Round(TotalHorasLectivas, 2)" totalHorasNoLectivas="@Math.Round(TotalHorasNoLectivas, 2)" />
+    </RadzenCard>
+</div>
+
+<!-- ===================== TABLA DE EDUCADORES ===================== -->
+<RadzenDataGrid @ref="gridEducadores"
+                AllowFiltering="false"
+                FilterPopupRenderMode="PopupRenderMode.OnDemand"
+                AllowPaging="true"
+                PageSize="5"
+                AllowSorting="false"
+                Data="@listaEducadores"
+                TItem="HrHorario1DTO"
+                class="rz-shadow-1"
+                Style="z-index:0;">
+    <Columns>
+        <RadzenDataGridColumn Width="50px" Title="#" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+            <Template Context="data">
+                @(listaEducadores.IndexOf(data) + 1)
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Title="Educador" Width="220px">
+            <Template Context="educador">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="FlexWrap.NoWrap">
+                    <RadzenImage Path="@($"/employees/{educador.Empleado}.jpg")"
+                                 Style="width: 40px; height: 40px; flex-shrink:0;"
+                                 class="rz-border-radius-2"
+                                 AlternateText="@(educador.NombreEmpleado)" />
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">@educador.NombreEmpleado</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-0">@educador.Empleado</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Property="@nameof(HrHorario1DTO.Ciclo)" Title="Ciclo" Width="120px" />
+
+        <RadzenDataGridColumn Width="140px" Property="Empleado" Title="">
+            <Template Context="educador">
+                <RadzenSplitButton Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" Shade="Shade.Lighter"
+                                   Text="Más"
+                                   Click=@(args => OnClick(args, educador))>
+                    <ChildContent>
+                        <RadzenSplitButtonItem Icon="visibility" Text="Ver Horario" Value="1" />
+                        <RadzenSplitButtonItem Icon="view_list" Text="Descargar Horario" Value="2" />
+                        <RadzenSplitButtonItem Icon="check_circle" Text="Aprobar Horario" Value="3" />
+                    </ChildContent>
+                </RadzenSplitButton>
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Width="140px" Title="Estado">
+            <Template Context="educador">
+                @if (educador.IdConfirmacion == 1)
+                {
+                    <RadzenChip Icon="check_circle" Text="Aprobado" ChipStyle="BadgeStyle.Success" Style="font-weight:100;font-size:0.8rem;" />
+                }
+                else
+                {
+                    <RadzenLabel Text="" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+
+
+@code {
+    //idCoordinador
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "i")]
+    public string idCoordinador { get; set; } = "";
+
+    public double TotalHorasLectivas { get; set; }
+    public double TotalHorasNoLectivas { get; set; }
+
+    //para llenar el grid de educadores
+    RadzenDataGrid<HrHorario1DTO> gridEducadores;
+    IList<HrHorario1DTO> listaEducadores;
+
+    AreaDTO Area = new();
+    AccesoUsuarioDTO acceso = new();
+    HrBitacoraConfirmacionDTO modeloConfirmacion = new();
+
+    private string ciclo = DateTime.Now.Year.ToString();
+    short area = 0;
+    private string userName = "";
+    private string idEmpleado = "0";
+    private string rolName = "";
+    private string CantidadEducadores = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerAcceso();
+        await ObtenerHorarios();
+        await ObtenerConsolidadoPorArea();
+    }
+
+    /******Carga los datos del educadores por area para mostrarselos al coordinador******/
+    private async Task ObtenerHorarios()
+    {
+        try
+        {
+            var response = await _sender.Send(new ObtenerHorariosQuery(ciclo));
+            if (response.Count > 0)
+            {
+                listaEducadores = response.Where(a => a.Area == acceso.IdArea).ToList() ?? new List<HrHorario1DTO>();
+                CantidadEducadores = listaEducadores.Count().ToString();
+
+                if (acceso.IdArea == 0)
+                {
+                    listaEducadores = response;
+                    CantidadEducadores = listaEducadores.Count().ToString();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+    /******Carga area para mostrarselo al admin o consultor******/
+    private async Task ObtenerAcceso()
+    {
+        var response = await _accesoServ.GetById(Convert.ToInt16(idCoordinador));
+        if (response.IdAcceso != 0)
+        {
+            acceso = response;
+        }
+    }
+    private async Task ObtenerConsolidadoPorArea()
+    {
+        var obj = await _dataToChar.OnlyHoursByArea(acceso.IdArea.ToString());
+        List<TimeSpan> hl = new();
+        List<TimeSpan> hnl = new();
+
+        foreach (var item in obj)
+        {
+            hl.Add(TimeSpan.Parse(item.Ia));
+            hl.Add(TimeSpan.Parse(item.Fmagis));
+
+            hnl.Add(TimeSpan.Parse(item.Aaa));
+            hnl.Add(TimeSpan.Parse(item.Alm));
+            hnl.Add(TimeSpan.Parse(item.Cuida));
+            hnl.Add(TimeSpan.Parse(item.Gaa));
+            hnl.Add(TimeSpan.Parse(item.Gao));
+            hnl.Add(TimeSpan.Parse(item.Ora));
+            hnl.Add(TimeSpan.Parse(item.Rarea));
+            hnl.Add(TimeSpan.Parse(item.Rcomuni));
+            hnl.Add(TimeSpan.Parse(item.Rorient));
+            hnl.Add(TimeSpan.Parse(item.Rpersonal));
+            hnl.Add(TimeSpan.Parse(item.Rtp));
+            hnl.Add(TimeSpan.Parse(item.Anp));
+        }
+
+
+        TimeSpan totalHorasLectivas = hl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        TimeSpan totalHorasNoLectivas = hnl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        var HorasLectivas = TimeSpan.FromMinutes(totalHorasLectivas.TotalHours);
+        var HorasNoLectivas = TimeSpan.FromMinutes(totalHorasNoLectivas.TotalHours);
+
+        TimeSpan total = HorasLectivas + HorasNoLectivas;
+
+        TotalHorasLectivas = HorasLectivas.TotalMinutes / total.TotalMinutes * 100;
+        TotalHorasNoLectivas = HorasNoLectivas.TotalMinutes / total.TotalMinutes * 100;
+    }
+
+    private async Task DescargarExcelConsolidados()
+    {
+
+        var consolidado = await _reportServ.ObtenerConsolidadoPorArea(acceso.IdArea.ToString(),ciclo);
+        byte[] excel = ExcelHorarioService.GenerarExcelConsolidados(consolidado);
+
+        var nombreArchivo = $"Consolidado_{acceso.AreaName}_{ciclo}.xlsx";
+        var base64 = Convert.ToBase64String(excel);
+        await _jsruntime.InvokeVoidAsync("downloadFileFromBytes", nombreArchivo, base64);
+    }
+    private async Task VerHorario(int educador)
+    {
+        var url = $"/page/horario/?e={educador}";
+        // _nav.NavigateTo($"/page/horario/?e={empleado}");
+        await _jsruntime.InvokeVoidAsync("abrirOtraPestaña", url);
+    }
+    private async Task DescargarExcel(int codigo)
+    {
+        try
+        {
+            //var idEmpleado = Convert.ToInt32(codigo);
+            var horario = await _reportServ.ObtenerExcel(codigo);
+
+            byte[] excel = ExcelHorarioService.GenerarExcel(horario);
+
+            var nombreArchivo = $"Horario_{codigo}_{ciclo}_.xlsx";
+            var base64 = Convert.ToBase64String(excel);
+
+            await _jsruntime.InvokeVoidAsync("downloadFileFromBytes", nombreArchivo, base64);
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+    }
+    private async Task AprobarHorario(HrHorario1DTO obj)
+    {
+        modeloConfirmacion.id_coordinador = Convert.ToInt16(idEmpleado);
+        modeloConfirmacion.id_horario1 = obj.IdHorario1;
+        // Mostrar confirmación antes de eliminar
+        var confirm = await _swal.FireAsync(new SweetAlertOptions
+        {
+            Title = "¿Está seguro?",
+            Text = $"Esta acción confirmara el horario del educador seleccionado.",
+            Icon = SweetAlertIcon.Warning,
+            ShowCancelButton = true,
+            ConfirmButtonText = "Sí, confirmar",
+            CancelButtonText = "Cancelar"
+        });
+
+        // Si el usuario cancela, no continúa
+        if (confirm.Dismiss == DismissReason.Cancel)
+            return;
+
+        try
+        {
+
+            var response = await _sender.Send(new AprobarHorarioCommand(obj.IdHorario1));
+
+            if (response)
+            {
+                await _swal.FireAsync("Exito", "Horario confirmado correctamente.", SweetAlertIcon.Success);
+                await ObtenerHorarios();
+            }
+            else
+            {
+                await _swal.FireAsync("Error", "No se pudo confirmar.", SweetAlertIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("Error", $"Ocurrió un error al confirmar: {ex.Message}", SweetAlertIcon.Error);
+        }
+    }
+    private async void OnClick(RadzenSplitButtonItem item, HrHorario1DTO horario)
+    {
+        if (item != null)
+        {
+            if (item.Value == "1")
+            {
+                await VerHorario(horario.Empleado);
+            }
+            else if (item.Value == "2")
+            {
+                await DescargarExcel(horario.Empleado);
+            }
+            else if (item.Value == "3")
+            {
+                await AprobarHorario(horario);
+            }
+        }
+        
+    }
+}

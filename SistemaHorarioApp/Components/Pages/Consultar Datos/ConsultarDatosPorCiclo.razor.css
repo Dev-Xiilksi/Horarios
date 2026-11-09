@@ -1,0 +1,72 @@
+﻿.btn-agregar-detalle {
+    font-weight: bolder;
+    font-size: 0.7rem;
+    color: #CC1243;
+    border: 1.5px solid #CC1243;
+    background-color: #fff;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    padding-left: 20px;
+    padding-right: 20px;
+    margin: 1px;
+}
+
+.btn-registrar {
+    font-weight: bolder;
+    font-size: 0.7rem;
+    color: #fff;
+    border: none;
+    background-color: #CC1243;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    padding-left: 20px;
+    padding-right: 20px;
+    margin: 1px;
+
+    span {
+        font-size: 0.2rem;
+    }
+}
+
+.btn-delete {
+    font-weight: bolder;
+    font-size: 0.7rem;
+    border: none;
+}
+
+th {
+    color: white;
+    font-weight: 200;
+}
+
+.d-heaader {
+    display: flex;
+    justify-content: end;
+}
+
+
+/* Contenedor principal de la tabla */
+.table-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.table td {
+    max-width: 100px;
+}
+
+@media (max-width:600px) {
+    /* Forzar ancho fijo en las celdas */
+    .table td {
+        max-width: 200px;
+        min-width: 150px;
+    }
+}

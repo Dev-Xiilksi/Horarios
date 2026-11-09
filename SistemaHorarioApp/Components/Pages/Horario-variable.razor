@@ -1,0 +1,616 @@
+@page "/ss"
+@using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager _nav
+@* @attribute [Authorize] *@
+@inject IHrGeneralService _generalServ
+@inject IHrGeneral2Service _general2Serv
+@inject ISender _sender
+@inject IColegioService _colegioServ
+@inject INivelesService _nivelServ
+@inject IGradosService _gradoServ
+@inject IAreaService _areaServ
+@inject IEmplegenService _emplegenServ
+@inject IDiasService _diaServ
+@inject IHrActividadesService _actividadServ
+@inject IMaestrosPorSeccionService _maestroServ
+@inject IHrVariableService _horarioVariableServ
+@inject IGradosService _hrGradoService
+@inject AuthenticationStateProvider AuthProvider
+@* SweetAlert *@
+@inject SweetAlertService _swal
+@inject IJSRuntime _jsruntime
+
+<RadzenTemplateForm Data="@modelMain" TItem="HrHorario1DTO" Submit="@GuardarCambios">
+    <RadzenCard Style="max-width: 100%;">
+        <h2>Registro de horarios variables</h2>
+        <h6 style="font-weight:200; color:#676774;">Ingreso de horas de inicio y fin de jornada laboral por día.</h6>
+
+        @* ─────────────── Encabezado: Educador / Area / Nivel / Grado ─────────────── *@
+        <RadzenCard Style="margin-bottom:5px;" class="rz-p-0">
+            <div class="rz-p-0 rz-p-md-5 bg-white">
+                <RadzenRow Gap="0.1rem">
+                    <RadzenColumn Size="12" SizeSM="6">
+                        <RadzenStack>
+                            <RadzenFormField Text="Educador" Variant="@variant">
+                                <RadzenTextBox ReadOnly @bind-Value="@userName" />
+                            </RadzenFormField>
+
+                            <RadzenFormField Text="Area" Variant="@variant">
+                                <ChildContent>
+                                    @if (areas?.Any() == true)
+                                    {
+                                        <RadzenDropDown Data="@areas" Name="areas"
+                                                        TextProperty="Nombre"
+                                                        ValueProperty="Areas"
+                                                        @bind-Value="@modelMain.Area" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Cargando áreas..." />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="areas" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeSM="6">
+                        <RadzenStack>
+                            <RadzenFormField Text="Nivel" Variant="@variant">
+                                <ChildContent>
+                                    @if (niveles?.Any() == true)
+                                    {
+                                        <RadzenDropDown @bind-Value=@modelMain.Nivels Data=@niveles
+                                                        TextProperty="@nameof(NivelDTO.Nombre)"
+                                                        ValueProperty="@nameof(NivelDTO.Nivel)" Name="nivel"
+                                                        Multiple=true AllowClear=true
+                                                        Chips=true
+                                                        Change="ObtenerGrados" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Cargando niveles..." />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="nivel" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+
+                            <RadzenFormField Text="Grado" Variant="@variant">
+                                <ChildContent>
+                                    @if (grados?.Any() == true)
+                                    {
+                                        <RadzenDropDown @bind-Value=@modelMain.Grados Data=@grados
+                                                        TextProperty="@nameof(GradoDTO.NombreNivel)"
+                                                        ValueProperty="@nameof(GradoDTO.ID)" Name="grado"
+                                                        Multiple=true AllowClear=true
+                                                        Chips=true />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Selecciona un nivel para obtener los grados" />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="grado" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </div>
+        </RadzenCard>
+
+        @* ─────────────── Franjas con días agregados dinámicamente ─────────────── *@
+        <RadzenCard style="overflow: auto;">
+            <div class="table-container">
+                <RadzenStack class="rz-p-0 rz-p-md-1" Gap="1rem">
+
+                    @for (int fi = 0; fi < Franjas.Count; fi++)
+                    {
+                        var franja = Franjas[fi];
+                        var franjaIndex = fi;
+
+                        <RadzenCard Variant="Variant.Outlined" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem;">
+
+                            <RadzenStack Orientation="Orientation.Horizontal"
+                                         JustifyContent="JustifyContent.SpaceBetween"
+                                         AlignItems="AlignItems.Center"
+                                         class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" style="font-weight:500;">
+                                    <RadzenIcon Icon="schedule" style="vertical-align:-4px; margin-right:4px;" />
+                                    Franja @(franjaIndex + 1)
+                                </RadzenText>
+                                @if (Franjas.Count > 1)
+                                {
+                                    <RadzenButton ButtonType="ButtonType.Button"
+                                                  ButtonStyle="ButtonStyle.Danger"
+                                                  Variant="Variant.Outlined"
+                                                  Size="ButtonSize.Small"
+                                                  Icon="delete"
+                                                  Text="Eliminar franja"
+                                                  Click="@(() => EliminarFranja(franja))" />
+                                }
+                            </RadzenStack>
+
+                            @if (!franja.Dias.Any())
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption"
+                                            style="color: var(--rz-text-secondary-color); font-style: italic; display:block; margin-bottom:0.75rem;">
+                                    Ningún día seleccionado — usa el botón para agregar días.
+                                </RadzenText>
+                            }
+
+                            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; margin-bottom: 0.75rem;">
+
+                                @foreach (var dia in franja.Dias.OrderBy(d => OrdenDia(d.Nombre)))
+                                {
+                                    var diaRef = dia;
+
+                                    <RadzenCard style="min-width:190px; border: 1px solid #AFA9EC; border-radius:8px; background:#EEEDFE; padding:0; overflow:hidden;">
+
+                                        <div style="background:#CECBF6; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" style="color:#3C3489; margin:0;">@diaRef.Nombre</RadzenText>
+                                            <RadzenButton ButtonType="ButtonType.Button"
+                                                          ButtonStyle="ButtonStyle.Light"
+                                                          Variant="Variant.Text"
+                                                          Size="ButtonSize.ExtraSmall"
+                                                          Icon="close"
+                                                          style="color:#534AB7; min-width:unset; padding:2px;"
+                                                          Click="@(() => EliminarDia(franja, diaRef))" />
+                                        </div>
+
+                                        <div style="padding:8px 10px; display:flex; flex-direction:column; gap:6px;">
+
+                                            <RadzenFormField Text="Hora inicio" Style="width:100%;">
+                                                <RadzenTimeSpanPicker @bind-Value="@diaRef.HoraInicio"
+                                                                      Name="@($"horaIni_{franjaIndex}_{diaRef.Nombre}")"
+                                                                      Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                            </RadzenFormField>
+
+                                            <RadzenFormField Text="Hora final" Style="width:100%;">
+                                                <RadzenTimeSpanPicker @bind-Value="@diaRef.HoraFin"
+                                                                      Name="@($"horaFin_{franjaIndex}_{diaRef.Nombre}")"
+                                                                      Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                            </RadzenFormField>
+
+                                            <RadzenFormField Text="Actividad" Style="width:100%;">
+                                                <ChildContent>
+                                                    <RadzenDropDown Data="@actividades"
+                                                                    Name="@($"actividad_{franjaIndex}_{diaRef.Nombre}")"
+                                                                    Class="fixed-dropdown"
+                                                                    TextProperty="Name"
+                                                                    ValueProperty="Id"
+                                                                    @bind-Value="@diaRef.ActividadId"
+                                                                    PopupStyle="min-width: 250px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenRequiredValidator Component="@($"actividad_{franjaIndex}_{diaRef.Nombre}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                                </Helper>
+                                            </RadzenFormField>
+
+                                        </div>
+                                    </RadzenCard>
+                                }
+
+                                @{
+                                    var diasDisponibles = DiasDisponibles(franja);
+                                }
+                                @if (diasDisponibles.Any())
+                                {
+                                    <div style="position:relative; align-self:flex-start; margin-top:4px;">
+                                        <RadzenButton ButtonType="ButtonType.Button"
+                                                      ButtonStyle="ButtonStyle.Light" Style="border:#CC1243;"
+                                                      Variant="Variant.Flat"
+                                                      Size="ButtonSize.Small"
+                                                      Icon="calendar_today"
+                                                      Text="Agregar día"
+                                                      Click="@(() => TogglePicker(franja))" />
+
+                                        @if (franja.MostrarPicker)
+                                        {
+                                            <div style="position:absolute; top:36px; left:0; z-index:100;
+                                                background:var(--rz-panel-background-color);
+                                                border:1px solid var(--rz-border-color);
+                                                border-radius:8px; padding:8px;
+                                                display:flex; flex-wrap:wrap; gap:6px;
+                                                min-width:220px;
+                                                box-shadow:0 4px 16px rgba(0,0,0,0.12);">
+                                                @foreach (var dia in diasDisponibles)
+                                                {
+                                                    var diaName = dia;
+                                                    <RadzenButton ButtonType="ButtonType.Button"
+                                                                  Text="@diaName"
+                                                                  ButtonStyle="ButtonStyle.Light"
+                                                                  Variant="Variant.Flat"
+                                                                  Size="ButtonSize.Small"
+                                                                  Click="@(() => AgregarDia(franja, diaName))" />
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </RadzenCard>
+                    }
+
+                </RadzenStack>
+            </div>
+
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" style="margin-top:1rem; padding-top:1rem; border-top: 1px solid #e0e0e0;">
+                <RadzenButton ButtonType="ButtonType.Button"
+                              Icon="add"
+                              Text="Agregar franja"
+                              Click="AgregarFranja" />
+
+                <RadzenButton ButtonType="ButtonType.Submit"
+                              Text="Guardar"
+                              Shade="Shade.Darker" Style="background:#CC1243; font-weight:300;" />
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenCard>
+</RadzenTemplateForm>
+
+@code {
+    #region Estado
+    string userName = "Cargando...";
+    string idEmpleado = "0";
+    string empresa = "Asociación Javeriana Guatemalteca";
+    string ciclo = DateTime.Now.Year.ToString();
+    Variant variant = Variant.Outlined;
+
+    private HrHorario1DTO modelMain = new HrHorario1DTO();
+
+    private List<AreaDTO> areas = new List<AreaDTO>();
+    private List<MaestrosporseccionDTO> maestrosSecciones = new List<MaestrosporseccionDTO>();
+    private List<DiaDTO> dias = new List<DiaDTO>();
+    private List<ActividadDTO> actividades = new List<ActividadDTO>();
+    private List<HrGeneral2DTO> data = new List<HrGeneral2DTO>();
+
+    private List<NivelDTO> niveles = new();
+    private List<GradoDTO> grados = new();
+
+    // ── Modelo de días/franjas independientes ──────────────────────────────
+    private class DiaHorario
+    {
+        public int? IdHrg2 { get; set; }
+        public short Dia { get; set; }          // 1=Lunes ... 6=Sábado
+        public string Nombre { get; set; } = "";
+        public TimeSpan HoraInicio { get; set; }
+        public TimeSpan HoraFin { get; set; }
+        public int? ActividadId { get; set; }
+    }
+
+    private class FranjaHorario
+    {
+        public List<DiaHorario> Dias { get; set; } = new();
+        public bool MostrarPicker { get; set; } = false;
+    }
+
+    private List<FranjaHorario> Franjas { get; set; } = new() { new FranjaHorario() };
+
+    // Numero de día ligado al campo "Dia" que espera HrHorario2DTO
+    private static readonly List<(short Numero, string Nombre)> TodosLosDias = new()
+    {
+        (1, "Lunes"), (2, "Martes"), (3, "Miércoles"), (4, "Jueves"), (5, "Viernes"), (6, "Sábado")
+    };
+    #endregion
+
+    // ── Helpers de franjas/días ─────────────────────────────────────────────
+    private static int OrdenDia(string nombre) => TodosLosDias.FindIndex(d => d.Nombre == nombre);
+
+    private List<string> DiasDisponibles(FranjaHorario franja) =>
+        TodosLosDias.Select(d => d.Nombre).Where(d => franja.Dias.All(x => x.Nombre != d)).ToList();
+
+    private void AgregarFranja()
+    {
+        CerrarTodosLosPickers();
+        Franjas.Add(new FranjaHorario());
+    }
+
+    private void EliminarFranja(FranjaHorario franja) => Franjas.Remove(franja);
+
+    private void AgregarDia(FranjaHorario franja, string nombre)
+    {
+        var numero = TodosLosDias.First(d => d.Nombre == nombre).Numero;
+        franja.Dias.Add(new DiaHorario
+        {
+            Nombre = nombre,
+            Dia = numero,
+            HoraInicio = TimeSpan.Zero,
+            HoraFin = TimeSpan.Zero
+        });
+        franja.MostrarPicker = false;
+    }
+
+    private void EliminarDia(FranjaHorario franja, DiaHorario dia) => franja.Dias.Remove(dia);
+
+    private void TogglePicker(FranjaHorario franja)
+    {
+        var estadoActual = franja.MostrarPicker;
+        CerrarTodosLosPickers();
+        franja.MostrarPicker = !estadoActual;
+    }
+
+    private void CerrarTodosLosPickers()
+    {
+        foreach (var f in Franjas) f.MostrarPicker = false;
+    }
+
+    // ── Ciclo de vida ────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        var obj = await AuthProvider.GetAuthenticationStateAsync();
+        var educadorLogeado = obj.User;
+
+        userName = educadorLogeado.Identity!.Name!;
+        idEmpleado = educadorLogeado.FindFirst("idUser")?.Value;
+
+        await LoadGeneral2Data();
+        await ObtenerAreas();
+        await ObtenerDias();
+        await ObtenerActividades();
+        await ObtenerMaestrosSeccion();
+        await ObtenereNiveles();
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task ObtenereNiveles()
+    {
+        try
+        {
+            var response = await _nivelServ.GetAll();
+            if (response.Count() > 0)
+            {
+                niveles = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading niveles: {ex.Message}");
+            niveles = new List<NivelDTO>();
+        }
+    }
+
+    private async Task ObtenerGrados(object nivel)
+    {
+        try
+        {
+            var response = await _gradoServ.GetAll();
+            if (response.Count > 0)
+            {
+                var lista = response;
+
+                var nivelesSel = (nivel as IEnumerable<object>)
+                              ?.Select(n => n?.ToString() ?? "")
+                              .ToArray()
+                          ?? Array.Empty<string>();
+
+                grados = lista
+                    .Where(a => !string.IsNullOrEmpty(a.Nivel) &&
+                                nivelesSel.Contains(a.Nivel)).ToList();
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading grados: {ex.Message}");
+            grados = new List<GradoDTO>();
+        }
+    }
+
+    private async Task ObtenerAreas()
+    {
+        var response = await _areaServ.GetAll();
+        if (response.Count > 0)
+        {
+            areas = response;
+        }
+    }
+
+    private async Task ObtenerMaestrosSeccion()
+    {
+        var response = await _maestroServ.GetAll();
+        if (response.Count > 0)
+        {
+            maestrosSecciones = response;
+        }
+    }
+
+    private async Task ObtenerDias()
+    {
+        var response = await _diaServ.GetAll();
+        if (response.Count > 0)
+        {
+            dias = response;
+        }
+    }
+
+    private async Task ObtenerActividades()
+    {
+        try
+        {
+            var response = await _actividadServ.GetAll(Convert.ToInt32(idEmpleado));
+            if (response.Count > 0)
+            {
+                actividades = response;
+                Console.WriteLine($"Loaded {actividades.Count} activities");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading activities: {ex.Message}");
+            actividades = new List<ActividadDTO>();
+        }
+    }
+
+    private async Task LoadGeneral2Data()
+    {
+        try
+        {
+            var response = await _general2Serv.GetAll();
+            if (response.Count > 0)
+            {
+                data = response;
+                Console.WriteLine($"Loaded {data.Count} general2 records");
+            }
+            else
+            {
+                data = new List<HrGeneral2DTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading general2 data: {ex.Message}");
+            data = new List<HrGeneral2DTO>();
+        }
+    }
+
+    // ── Carga del horario guardado, agrupando en franjas y días independientes ──
+    private async Task LoadData()
+    {
+        try
+        {
+            var hour1 = await _sender.Send(new ObtenerHorarioPorEmpleadoQuery(idEmpleado, ciclo));
+            if (hour1 == null)
+                return;
+
+            var hour2 = await _sender.Send(new ObtenerFranjasDelHorarioQuery(hour1.IdHorario1));
+            if (hour1.TipoFranja != 2)
+                return;
+
+            modelMain.IdHrg1 = hour1.IdHrg1;
+            modelMain.Area = hour1.Area;
+            modelMain.Nivel = hour1.Nivel;
+            modelMain.Grado = hour1.Grado;
+
+            var hrgrados = await _hrGradoService.ObtenerGrados(hour1.IdHorario1);
+            modelMain.Nivels = hrgrados.Select(a => a.Nivel).ToList();
+            await ObtenerGrados(modelMain.Nivels);
+            modelMain.Grados = hrgrados.Select(a => a.NivelGrado).ToList();
+
+            if (!hour2.Any()) return;
+
+            Franjas.Clear();
+
+            // Se agrupa igual que antes (mismo rango horario = misma franja),
+            // pero cada día conserva SU PROPIA hora/actividad de forma independiente.
+            var grupos = hour2.GroupBy(x => new { x.Horai, x.Horaf });
+
+            foreach (var grupo in grupos)
+            {
+                var franja = new FranjaHorario();
+
+                foreach (var item in grupo)
+                {
+                    var diaInfo = TodosLosDias.FirstOrDefault(d => d.Numero == item.Dia);
+                    if (diaInfo.Nombre == null) continue;
+
+                    franja.Dias.Add(new DiaHorario
+                    {
+                        IdHrg2 = item.IdHrg2,
+                        Dia = diaInfo.Numero,
+                        Nombre = diaInfo.Nombre,
+                        HoraInicio = TimeSpan.TryParse(item.Horai, out var ini) ? ini : TimeSpan.Zero,
+                        HoraFin = TimeSpan.TryParse(item.Horaf, out var fin) ? fin : TimeSpan.Zero,
+                        ActividadId = item.IdMps ?? (int?)item.IdHra
+                    });
+                }
+
+                if (franja.Dias.Any())
+                    Franjas.Add(franja);
+            }
+
+            if (!Franjas.Any())
+                Franjas.Add(new FranjaHorario());
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error cargando datos!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+
+    // ── Guardado: cada día se serializa de forma independiente ──────────────
+    private async Task GuardarCambios()
+    {
+        try
+        {
+            modelMain.Empresa = 1;
+            modelMain.Empleado = Convert.ToInt32(idEmpleado);
+            modelMain.Ciclo = ciclo;
+            modelMain.Colegio = "M";
+            modelMain.TipoFranja = 2;
+
+            var detallesGuardar = new List<HrHorario2DTO>();
+
+            foreach (var franja in Franjas)
+            {
+                foreach (var dia in franja.Dias)
+                {
+                    if (!dia.ActividadId.HasValue) continue;
+
+                    short? idActividad = null;
+                    short? idMps = null;
+
+                    if (dia.ActividadId.ToString()!.Length >= 4)
+                    {
+                        idMps = Convert.ToInt16(dia.ActividadId);
+                    }
+                    else if (dia.ActividadId != 0)
+                    {
+                        idActividad = Convert.ToInt16(dia.ActividadId);
+                    }
+
+                    if (idActividad == null && idMps == null) continue;
+
+                    var diferencia = dia.HoraFin - dia.HoraInicio;
+                    var tiempo = diferencia.TotalMinutes > 0
+                        ? $"{(int)diferencia.TotalHours:D2}:{diferencia.Minutes:D2}"
+                        : "00:00";
+
+                    detallesGuardar.Add(new HrHorario2DTO
+                    {
+                        Dia = dia.Dia,
+                        IdHra = idActividad,
+                        IdMps = idMps,
+                        IdHrg2 = dia.IdHrg2,
+                        Horai = dia.HoraInicio.ToString(),
+                        Horaf = dia.HoraFin.ToString(),
+                        Tiempo = tiempo,
+                    });
+                }
+            }
+
+            modelMain.HrHorario2s = detallesGuardar;
+
+            var resultadoBorrado = await _sender.Send(new EliminarHorarioCommand(Convert.ToInt32(idEmpleado)));
+            if (!resultadoBorrado.status)
+            {
+                await _swal.FireAsync("", resultadoBorrado.message, SweetAlertIcon.Info);
+                return;
+            }
+
+            var response = await _sender.Send(new CrearHorarioCommand(modelMain));
+            if (response.IdHorario1 > 0)
+            {
+                await _swal.FireAsync("¡Exito!", "Operación realizada con éxito.", SweetAlertIcon.Success);
+                modelMain = new HrHorario1DTO();
+                Franjas = new() { new FranjaHorario() };
+                StateHasChanged();
+                _nav.NavigateTo("/page/home", forceLoad: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+}

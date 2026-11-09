@@ -1,0 +1,798 @@
+﻿@page "/page/horario-fijo"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IHrGeneralService _generalServ
+@inject IHrGeneral2Service _general2Serv
+@inject IListadoHorarioColaboradorService _listadoHC
+@inject IAreaService _areaService
+@inject INivelesService _nivelService
+@inject IColegioNivelGradoSeccionService _colegioService
+@inject IHrFrecuenciaService _frecuenciaService
+@inject IHrActividadesService _actividadService
+@inject ISender _sender
+@inject IGradosService _gradosService
+@inject IJSRuntime _js
+
+@inject NavigationManager _nav
+@* SweetAlert *@
+@inject SweetAlertService _swal
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthProvider
+
+<RadzenTemplateForm Data="@modelMain" TItem="HrHorario1DTO" Submit="@Guardar">
+    <RadzenCard Style="max-width: 100%;">
+        <h2>Registro de horario</h2>
+        <h6 style="font-weight:200; color:#676774;">Ingreso de horas de inicio y fin de jornada laboral por día.</h6>
+
+        @* FIRST FORM *@
+        <RadzenCard Variant="Variant.Text" class="rz-p-0 rz-border-radius-0" style="margin-bottom:2px;">
+            <div class="rz-p-0 rz-p-md-0 bg-white">
+                <RadzenRow Gap="0.1rem">
+                    <RadzenColumn Size="12" SizeSM="6">
+                        <RadzenStack>
+                            @* EMPLEADO *@
+                            <RadzenFormField Text="Educador" Variant="@variant">
+                                <RadzenTextBox ReadOnly @bind-Value="@userName" InputSize="InputSize.Small"/>
+                            </RadzenFormField>
+
+                            @* AREA *@
+                            <RadzenFormField Text="Area" Variant="@variant">
+                                <ChildContent>
+                                    @if (areas?.Any() == true)
+                                    {
+                                        <RadzenDropDown Data="@areas" Name="areas" id="menuUsuarios" InputSize="InputSize.Small"
+                                                        TextProperty="Nombre"
+                                                        ValueProperty="Areas"
+                                                        @bind-Value="@modelMain.Area" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Cargando áreas..." />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="areas" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeSM="6">
+                        <RadzenStack>
+                            @* Nivels *@
+                            <RadzenFormField Text="Nivel" Variant="@variant">
+                                <ChildContent>
+                                    @if (niveles?.Any() == true)
+                                    {
+                                        <RadzenDropDown @bind-Value=@modelMain.Nivels Data=@niveles InputSize="InputSize.Small"
+                                                        TextProperty="@nameof(NivelDTO.Nombre)"
+                                                        ValueProperty="@nameof(NivelDTO.Nivel)" Name="nivel"
+                                                        Multiple=true AllowClear=true 
+                                                        Chips=true 
+                                                        Change="ObtenerGrados" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Cargando niveles..." />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="nivel" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+                            @* grados *@
+                            <RadzenFormField Text="Grado" Variant="@variant">
+                                <ChildContent>
+                                    @if (grados?.Any() == true)
+                                    {
+                                        <RadzenDropDown @bind-Value=@modelMain.Grados Data=@grados InputSize="InputSize.Small"
+                                                        TextProperty="@nameof(GradoDTO.NombreNivel)"
+                                                        ValueProperty="@nameof(GradoDTO.ID)" Name="grado"
+                                                        Multiple=true AllowClear=true
+                                                        Chips=true />
+                                    }
+                                    else
+                                    {
+                                        <RadzenLabel Text="Selecciona un nivel para obtener los grados" />
+                                    }
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenRequiredValidator Component="grado" Text="Es requerido selección."></RadzenRequiredValidator>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </div>
+        </RadzenCard>
+
+        @* TABLE *@
+            <RadzenStack  Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" class="rz-p-0 rz-mb-0 rz-border-radius-0" >
+                <RadzenFormField Text="Seleccione" Variant="@variant">
+                    <ChildContent>
+                        @if (general1?.Any() == true)
+                        {
+                            <RadzenDropDown Name="general" Data="@general1" InputSize="InputSize.Small"
+                                            TextProperty="Nombre"
+                                            ValueProperty="IdHrg1"
+                                            @bind-Value="@modelMain.IdHrg1"
+                                            Change="@(args => LoadHourData(modelMain.IdHrg1))" />
+                        }
+                        else
+                        {
+                            <RadzenLabel Text="Cargando horarios..." />
+                        }
+                    </ChildContent>
+                    <Helper>
+                        <RadzenRequiredValidator Component="general" Text="Es requerido selección."></RadzenRequiredValidator>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenStack>
+            <div style="overflow-x: auto;">
+                @if (hourData?.Any() == true)
+                {
+                    <RadzenDataGrid TItem="HrGeneral2DTO" Data="@hourData" AllowFiltering="false" AllowPaging="false" 
+                        PageSize="@size" AllowSorting="false" AllowColumnResize="true" tex Style="z-index:0;">
+                        <Columns>
+                            @* HORARIOS *@
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Property="FullValue" Title="Horario" Width="150px" />
+                            <!-- LUNES -->
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Title="Lunes" Width="150px">
+                                <Template Context="item">
+
+                                        <RadzenFormField Text="Seleccionar" Variant="@variant">
+                                            <ChildContent>
+                                                <RadzenDropDown Data="@actividades" Name="@($"lunes_{item.Index}")" InputSize="InputSize.Small"
+                                                                AllowFiltering="true"
+                                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                TextProperty="Name"
+                                                                ValueProperty="Id"
+                                                                @bind-Value="@item.LunesActividadId"
+                                                                Style="width:100%;"
+                                                                PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                            </ChildContent>
+                                            <Helper>
+                                                <RadzenRequiredValidator Component="@($"lunes_{item.Index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                            </Helper>
+                                        </RadzenFormField>   
+
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <!-- MARTES -->
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Title="Martes" Width="150px">
+                                <Template Context="item">
+
+                                        <RadzenFormField Text="Seleccionar" Variant="@variant">
+                                            <ChildContent>
+                                        <RadzenDropDown Data="@actividades" Name="@($"martes_{item.Index}")" InputSize="InputSize.Small"
+                                                                AllowFiltering="true"
+                                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                TextProperty="Name"
+                                                                ValueProperty="Id"
+                                                                @bind-Value="@item.MartesActividadId"
+                                                                Style="width:100%;"
+                                                                PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                            </ChildContent>
+                                            <Helper>
+                                                <RadzenRequiredValidator Component="@($"martes_{item.Index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                            </Helper>
+                                        </RadzenFormField>
+
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <!-- MIERCOLES -->
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Title="Miércoles" Width="150px">
+                                <Template Context="item">
+
+                                        <RadzenFormField Text="Seleccionar" Variant="@variant">
+                                            <ChildContent>
+                                        <RadzenDropDown Data="@actividades" Name="@($"miercoles_{item.Index}")" InputSize="InputSize.Small"
+                                                                AllowFiltering="true"
+                                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                TextProperty="Name"
+                                                                ValueProperty="Id"
+                                                                @bind-Value="@item.MiercolesActividadId"
+                                                                Style="width:100%;"
+                                                                PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                            </ChildContent>
+                                            <Helper>
+                                                <RadzenRequiredValidator Component="@($"miercoles_{item.Index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                            </Helper>
+                                        </RadzenFormField>
+
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <!-- JUEVES -->
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Title="Jueves" Width="150px">
+                                <Template Context="item">
+                                        <RadzenFormField Text="Seleccionar" Variant="@variant">
+                                            <ChildContent>
+                                        <RadzenDropDown Data="@actividades" Name="@($"jueves_{item.Index}")" InputSize="InputSize.Small"
+                                                                AllowFiltering="true"
+                                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                TextProperty="Name"
+                                                                ValueProperty="Id"
+                                                                @bind-Value="@item.JuevesActividadId"
+                                                                Style="width:100%;"
+                                                                PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                            </ChildContent>
+                                            <Helper>
+                                            <RadzenRequiredValidator Component="@($"jueves_{item.Index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                            </Helper>
+                                        </RadzenFormField>
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <!-- VIERNES -->
+                            <RadzenDataGridColumn TItem="HrGeneral2DTO" Title="Viernes" Width="170px">
+                                <Template Context="item">
+                                        <RadzenFormField Text="Seleccionar" Variant="@variant">
+                                            <ChildContent>
+                                        <RadzenDropDown Data="@actividades" Name="@($"viernes_{item.Index}")" InputSize="InputSize.Small"
+                                                                AllowFiltering="true"
+                                                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                TextProperty="Name"
+                                                                ValueProperty="Id"
+                                                                @bind-Value="@item.ViernesActividadId"
+                                                                Style="width:100%;"
+                                                                PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                            </ChildContent>
+                                            <Helper>
+                                            <RadzenRequiredValidator Component="@($"viernes_{item.Index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                            </Helper>
+                                        </RadzenFormField>
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <RadzenAlert Text="Seleccione un horario para ver las franjas horarias." />
+                }
+            </div>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.2rem" Style="margin-top:5px;">
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Guardar" Shade="Shade.Darker" Style="background:#CC1243; font-weight:300;" />
+        </RadzenStack>
+    </RadzenCard>
+</RadzenTemplateForm>
+
+@code {
+    int size = 0;
+    string userName = "Cargando...";
+    string idEmpleado = "0";
+    string rol = string.Empty;
+    string test = "";
+    string ciclo = DateTime.Now.Year.ToString();
+    Variant variant = Variant.Outlined;
+    // Initialize all collections to prevent null references
+    private HrHorario1DTO modelMain = new HrHorario1DTO();
+    private List<HrGeneralDTO> general1 = new List<HrGeneralDTO>();
+    private List<HrGeneral2DTO> general2 = new List<HrGeneral2DTO>();
+    private List<AreaDTO> areas = new List<AreaDTO>();
+    private List<NivelDTO> niveles = new List<NivelDTO>();
+    private List<ColegioNivelGradoSeccionDTO> cngs = new List<ColegioNivelGradoSeccionDTO>();
+    private List<CorrecioTrabajosDTO> correciones = new List<CorrecioTrabajosDTO>();
+    private List<HrFrecuenciaDTO> frecuencias = new List<HrFrecuenciaDTO>();
+    private List<ActividadDTO> actividades = new List<ActividadDTO>();
+    private List<HrGeneral2DTO> data = new List<HrGeneral2DTO>();
+    private List<HrGeneral2DTO> hourData = new List<HrGeneral2DTO>();
+    private List<HrHorario2DTO> detalles = new List<HrHorario2DTO>();
+    private List<GradoDTO> grados = new();
+
+    private ColegioNivelGradoSeccionDTO? cngsSeleccionado;
+    private CorrecioTrabajosDTO? correccionSeleccionado;
+    private HrFrecuenciaDTO? frecuenciaSeleccionada;
+    private ActividadDTO? actividadSeleccionada;
+
+    void ShowNotification(NotificationMessage message)
+    {
+        NotificationService.Notify(message);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            /******para validar si ya tiene datos ingresado y si los tiene ocultar el boton*******/
+            var response = await _listadoHC.Colaborador(Convert.ToInt32(idEmpleado));
+
+            var obj = await AuthProvider.GetAuthenticationStateAsync();
+            var educadorLogeado = obj.User;
+
+            userName = educadorLogeado.Identity!.Name!;
+            idEmpleado = educadorLogeado.FindFirst("idUser")?.Value;
+
+            await ObtenerGenerales();
+            await ObtenereNiveles();
+            await ObtenerAreas();
+            await ObtenerColegios();
+            await ObtenerActividades();
+            await LoadGeneral2Data();
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during initialization: {ex.Message}");
+        }
+    }
+
+    private async Task LoadGeneral2Data()
+    {
+        try
+        {
+            var response = await _general2Serv.GetAll();
+            if (response.Any())
+            {
+                data = response ?? new List<HrGeneral2DTO>();
+                Console.WriteLine($"Loaded {data.Count} general2 records");
+            }
+            else
+            {
+                data = new List<HrGeneral2DTO>();
+                Console.WriteLine("Failed to load general2 data");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading general2 data: {ex.Message}");
+            data = new List<HrGeneral2DTO>();
+        }
+    }
+
+    /*****Obtener Generales*****/
+    private async Task ObtenerGenerales()
+    {
+        try
+        {
+            var response = await _generalServ.GetAll();
+            if (response.Any())
+            {
+                general1 = response as List<HrGeneralDTO> ?? new List<HrGeneralDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading generales: {ex.Message}");
+            general1 = new List<HrGeneralDTO>();
+        }
+    }
+
+    /*****Obtener areas*****/
+    private async Task ObtenerAreas()
+    {
+        try
+        {
+            //await _js.InvokeVoidAsync("console.log", "areas ");
+            var response = await _areaService.GetAll();
+            if (response != null)
+            {
+                areas = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading areas: {ex.Message}");
+            areas = new List<AreaDTO>();
+        }
+    }
+
+    /******NIVELES*******/
+    private async Task ObtenereNiveles()
+    {
+        try
+        {
+            var response = await _nivelService.GetAll();
+            if (response.Count() > 0)
+            {
+                niveles = response as List<NivelDTO> ?? new List<NivelDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading niveles: {ex.Message}");
+            niveles = new List<NivelDTO>();
+        }
+    }
+
+    /*****Obtener colegio*****/
+    private async Task ObtenerColegios()
+    {
+        try
+        {
+            var response = await _colegioService.GetAll();
+            if (response.Any())
+            {
+                cngs = response as List<ColegioNivelGradoSeccionDTO> ?? new List<ColegioNivelGradoSeccionDTO>();
+                cngsSeleccionado = cngs.FirstOrDefault();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading colegios: {ex.Message}");
+            cngs = new List<ColegioNivelGradoSeccionDTO>();
+        }
+    }
+
+    /******Actividades******/
+    private async Task ObtenerActividades()
+    {
+        try
+        {
+            var response = await _actividadService.GetAll(Convert.ToInt32(idEmpleado));
+            if (response.Any())
+            {
+                var listado = response;
+
+                actividades = rol switch
+                {
+                    "Educador" => listado.Where(a => a.TipoOpcion == 1).ToList(),
+                    "Orientador" => listado.Where(a => a.TipoOpcion != 3).ToList(),
+                    "Acompañante" => listado.Where(a => a.TipoOpcion != 2).ToList(),
+                    _ => listado.ToList()
+                };
+                actividadSeleccionada = actividades.FirstOrDefault();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading activities: {ex.Message}");
+            actividades = new List<ActividadDTO>();
+        }
+    }
+
+    /******Grados******/
+    // private async Task ObtenerGrados(object nivel)
+    // {
+    //     try
+    //     {
+    //         var response = await _gradosService.GetAll();
+    //         if (response.Any())
+    //         {
+    //             var lista = response;
+    //             grados = lista.Where(a => a.Nivel == nivel.ToString()).ToList();
+
+    //             // var lista = response.value ?? new List<GradoDTO>();
+    //             // var niveles = (nivel as IEnumerable<object>)
+    //             //               ?.Select(n => n?.ToString() ?? "")
+    //             //               .ToArray()
+    //             //           ?? Array.Empty<string>();
+
+    //             // grados = lista
+    //             //     .Where(a => !string.IsNullOrEmpty(a.Nivel) &&
+    //             //                 niveles.Contains(a.Nivel)).ToList();
+    //             StateHasChanged();
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine($"Error loading grados: {ex.Message}");
+    //         grados = new List<GradoDTO>();
+    //     }
+    // }
+    private async Task ObtenerGrados(object nivel)
+    {
+        try
+        {
+            //await _jsruntime.InvokeVoidAsync("console.log", nivel);
+            var response = await _gradosService.GetAll();
+            if (response.Count > 0)
+            {
+                var lista = response;
+
+                #region PorSiVieneVariosNiveles
+                var niveles = (nivel as IEnumerable<object>)
+                              ?.Select(n => n?.ToString() ?? "")
+                              .ToArray()
+                          ?? Array.Empty<string>();
+
+                grados = lista
+                    .Where(a => !string.IsNullOrEmpty(a.Nivel) &&
+                                niveles.Contains(a.Nivel)).ToList();
+
+
+                #endregion
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading grados: {ex.Message}");
+            grados = new List<GradoDTO>();
+        }
+    }
+
+    /******Genera la tabla según el nivel del educador******/
+    private async Task LoadHourData(int? idhrg1)
+    {
+        try
+        {
+            if (idhrg1 >= 1 && data?.Any() == true)
+            {
+                hourData = data.Where(a => a.IdHrg1 == idhrg1)
+                .Select((item, index) =>
+                {
+                    item.Index = index;
+                    return item;
+                })
+                .ToList();
+                
+                size = hourData.Count;
+            }
+            else
+            {
+                hourData = new List<HrGeneral2DTO>();
+                size = 0;
+            }
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            hourData = new List<HrGeneral2DTO>();
+            size = 0;
+        }
+    }
+
+    /*****Guardar cambios*****/
+    private async Task Guardar()
+    {
+        try
+        {
+            modelMain.Empresa = 1;
+            modelMain.Empleado = Convert.ToInt32(idEmpleado);
+            modelMain.Ciclo = ciclo;
+            modelMain.Colegio = "M";
+            modelMain.TipoFranja = 1;
+
+            // prepara detalles
+            #region "Detalles"
+            detalles.Clear();
+            if (hourData?.Any() == true)
+            {
+                foreach (var fila in hourData)
+                {
+                    short? idActivity = null;
+                    short? idMps = null;
+                    if (fila.LunesActividadId.HasValue)
+                    {
+
+                        if (fila.LunesActividadId.ToString().Length >= 4)
+                        {
+                            idMps = Convert.ToInt16(fila.LunesActividadId);
+                        }
+                        else
+                        {
+                            idActivity = Convert.ToInt16(fila.LunesActividadId);
+                        }
+
+                        detalles.Add(new HrHorario2DTO
+                        {
+                            Dia = 1,
+                            IdHra = idActivity,
+                            IdMps = idMps,
+                            IdHrg2 = fila.IdHrg2,
+                            Horai = fila.Horai,
+                            Horaf = fila.Horaf,
+                            Tiempo = fila.Tiempo
+                        });
+                    }
+
+                    idActivity = null;
+                    idMps = null;
+                    if (fila.MartesActividadId.HasValue)
+                    {
+                        if (fila.MartesActividadId.ToString().Length >= 4)
+                        {
+                            idMps = Convert.ToInt16(fila.MartesActividadId);
+                        }
+                        else
+                        {
+                            idActivity = Convert.ToInt16(fila.MartesActividadId);
+                        }
+                        detalles.Add(new HrHorario2DTO
+                        {
+                            Dia = 2,
+                            IdHra = idActivity,
+                            IdMps = idMps,
+                            IdHrg2 = fila.IdHrg2,
+                            Horai = fila.Horai,
+                            Horaf = fila.Horaf,
+                            Tiempo = fila.Tiempo
+                        });
+                    }
+
+                    idActivity = null;
+                    idMps = null;
+                    if (fila.MiercolesActividadId.HasValue)
+                    {
+                        if (fila.MiercolesActividadId.ToString().Length >= 4)
+                        {
+                            idMps = Convert.ToInt16(fila.MiercolesActividadId);
+                        }
+                        else
+                        {
+                            idActivity = Convert.ToInt16(fila.MiercolesActividadId);
+                        }
+                        detalles.Add(new HrHorario2DTO
+                        {
+                            Dia = 3,
+                            IdHra = idActivity,
+                            IdMps = idMps,
+                            IdHrg2 = fila.IdHrg2,
+                            Horai = fila.Horai,
+                            Horaf = fila.Horaf,
+                            Tiempo = fila.Tiempo
+                        });
+                    }
+
+                    idActivity = null;
+                    idMps = null;
+                    if (fila.JuevesActividadId.HasValue)
+                    {
+                        if (fila.JuevesActividadId.ToString().Length >= 4)
+                        {
+                            idMps = Convert.ToInt16(fila.JuevesActividadId);
+                            Console.WriteLine("tiene 4 jueves");
+                        }
+                        else
+                        {
+                            idActivity = Convert.ToInt16(fila.JuevesActividadId);
+                            Console.WriteLine("notiens" + idActivity);
+                        }
+                        detalles.Add(new HrHorario2DTO
+                        {
+                            Dia = 4,
+                            IdHra = idActivity,
+                            IdMps = idMps,
+                            IdHrg2 = fila.IdHrg2,
+                            Horai = fila.Horai,
+                            Horaf = fila.Horaf,
+                            Tiempo = fila.Tiempo
+                        });
+                    }
+
+                    idActivity = null;
+                    idMps = null;
+                    if (fila.ViernesActividadId.HasValue)
+                    {
+                        if (fila.ViernesActividadId.ToString().Length >= 4)
+                        {
+                            idMps = Convert.ToInt16(fila.ViernesActividadId);
+                        }
+                        else
+                        {
+                            idActivity = Convert.ToInt16(fila.ViernesActividadId);
+                        }
+
+                        detalles.Add(new HrHorario2DTO
+                        {
+                            Dia = 5,
+                            IdHra = idActivity,
+                            IdMps = idMps,
+                            IdHrg2 = fila.IdHrg2,
+                            Horai = fila.Horai,
+                            Horaf = fila.Horaf,
+                            Tiempo = fila.Tiempo
+                        });
+                    }
+                }
+            }
+            #endregion
+
+            modelMain.HrHorario2s = detalles;
+
+            //modelMain.HrHorarioExtras = detallesEventos;
+
+            if (detalles.Count == 0)
+            {
+                await _swal.FireAsync("¡Atención!", "Ingrese detalles de horario.", SweetAlertIcon.Info);
+            }
+            else
+            {
+                var resultadoBorrado = await _sender.Send(new EliminarHorarioCommand(Convert.ToInt32(idEmpleado)));
+
+                if (!resultadoBorrado.status)
+                {
+                    //resultadoBorrado = resultado.message;
+
+                    ShowNotification(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Mensaje", Detail = resultadoBorrado.message, Duration = 4000 });
+                    //await _swal.FireAsync("",resultadoBorrado.message, SweetAlertIcon.Info);
+                    return;
+                }
+                var response = await _sender.Send(new CrearHorarioCommand(modelMain));
+
+                //await _js.InvokeVoidAsync("console.log", response);
+                if (response.IdHorario1 > 0)
+                {
+                    await _swal.FireAsync("¡Exito!", "Operación realizada con exito.", SweetAlertIcon.Success);
+
+                    /******para validar si ya tiene datos ingresado y si los tiene ocultar el boton*******/
+                    var consult = await _listadoHC.Colaborador(Convert.ToInt32(idEmpleado));
+
+                    modelMain = new HrHorario1DTO();
+                    StateHasChanged();
+                    _nav.NavigateTo("/page/home", forceLoad: true);
+                }
+                else
+                {
+                    await _swal.FireAsync("¡Oops!", "Error al crear", SweetAlertIcon.Warning);
+                }
+             }
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+
+    /*--------------Carga datos para el usuario pueda ver su franja--------------*/
+    /*****Permite cargar los datos del educador*****/
+    private async Task LoadData()
+    {
+        try
+        {
+            var hour1 = await _sender.Send(new ObtenerHorarioPorEmpleadoQuery(idEmpleado, ciclo));
+
+            if (hour1 == null) 
+                return;
+
+            if (hour1.TipoFranja != 1)
+                return;
+
+            // 1. Poblar encabezado del formulario
+            modelMain.IdHrg1 = hour1.IdHrg1;
+            modelMain.Area = hour1.Area;
+            modelMain.Nivel = hour1.Nivel;
+            modelMain.Grado = hour1.Grado;
+
+            var hrgrados = await _gradosService.ObtenerGrados(hour1.IdHorario1); 
+            modelMain.Nivels = hrgrados.Select(a => a.Nivel).ToList();
+            await ObtenerGrados(modelMain.Nivels);
+            modelMain.Grados = hrgrados.Select(a => a.NivelGrado).ToList();
+
+            // 2. Renderizar la tabla (llena hourData con HrGeneral2DTO)
+            await LoadHourData(hour1.IdHrg1);
+
+            if (!hourData.Any()) return;
+
+            // 3. Traer el detalle guardado por el usuario
+            //    hour1.value.IdHorario1 es el PK del registro en HrHorario1
+            var hour2 = await _sender.Send(new ObtenerFranjasDelHorarioQuery(hour1.IdHorario1));
+
+            if (hour2.Any() == true)
+            {
+                foreach (var item in hour2)
+                {
+                    // Buscar la fila en hourData cuyo IdHrg2 coincida
+                    var fila = hourData.FirstOrDefault(x => x.IdHrg2 == item.IdHrg2);
+                    if (fila == null) continue;
+
+                    // Si IdMps tiene valor es una materia (id largo), sino es actividad normal
+                    var actividadId = item.IdMps ?? (int?)item.IdHra;
+
+                    switch (item.Dia)
+                    {
+                        case 1: fila.LunesActividadId = actividadId; break;
+                        case 2: fila.MartesActividadId = actividadId; break;
+                        case 3: fila.MiercolesActividadId = actividadId; break;
+                        case 4: fila.JuevesActividadId = actividadId; break;
+                        case 5: fila.ViernesActividadId = actividadId; break;
+                        case 6: fila.SabadoActividadId = actividadId; break;
+                    }
+                }
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error cargando datos!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+}

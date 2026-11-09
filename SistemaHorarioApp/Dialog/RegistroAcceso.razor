@@ -1,0 +1,253 @@
+@using CurrieTechnologies.Razor.SweetAlert2
+@using Microsoft.JSInterop
+@using Radzen
+@using Radzen.Blazor
+@inject IAccesoUsuarioService _accesoUsuario
+@inject IAreaService _areaServ
+@inject IRolService _rolServ
+@inject IEmplegenService _emplegenServ
+@* SweetAlert *@
+@inject SweetAlertService _swal
+@* para notificaciones *@
+
+@inject IJSRuntime _js
+
+<RadzenTemplateForm Data="@model" TItem="AccesoUsuarioDTO" Submit="@GuardarCambios" InvalidSubmit="@(args => Console.WriteLine("Formulario inválido"))">
+<RadzenCard>
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="10" SizeSM="4">
+            <RadzenStack>
+                    <RadzenImage Path="@EmployeeImagePath"
+                                 Style="width: 100%; height: 100%; flex-shrink:0; border: 1px solid #ccc;"
+                                 class="rz-border-radius-2 "
+                                 AlternateText="img" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="10" SizeSM="4">
+            <RadzenStack>
+                    @* COLABORADORES *@
+                    <div class="d-row">
+                        <RadzenFormField Text="Colaborador" Variant="@variant" Style="width:90%;">
+                            <ChildContent>
+                                <RadzenDropDown FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" InputSize="InputSize.Small"
+                                                Name="empleado"
+                                                Style="width: 100%;"
+                                                TValue="int" @bind-Value="@model.IdEmpleado"
+                                                AllowFiltering="true"
+                                                Data="@empleados"
+                                                TextProperty="@nameof(EmplegenDTO.FullName)"
+                                                ValueProperty="@nameof(EmplegenDTO.Empleado)"
+                                                InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "Select customer" }})" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="empleado" Text="Es requerido selección."></RadzenRequiredValidator>
+                            </Helper>
+                        </RadzenFormField>
+                    </div>
+
+                    @* AREAS *@
+                    <div class="d-row">
+                        <RadzenFormField Text="Area" Variant="@variant" Style="width:90%;">
+                            <ChildContent>
+                                @if (areas.Any())
+                                {
+                                    <RadzenDropDown Data="areas" Name="area" InputSize="InputSize.Small"
+                                                    TextProperty="Nombre"
+                                                    ValueProperty="Areas"
+                                                    @bind-Value="@model.IdArea" />
+
+                                }
+                                else
+                                {
+                                    <RadzenLabel Text="Cargando areas..." />
+                                }
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="area" Text="Es requerido selección."></RadzenRequiredValidator>
+                            </Helper>
+                        </RadzenFormField>
+                    </div>
+
+                    @* ROLES *@
+                    <div class="d-row">
+                        <RadzenFormField Text="Rol" Variant="@variant" Style="width:90%;">
+                            <ChildContent>
+                                @if (roles.Any())
+                                {
+                                    <RadzenDropDown Data="roles" Name="rol" InputSize="InputSize.Small"
+                                                    TextProperty="Nombre"
+                                                    ValueProperty="IdRol"
+                                                    @bind-Value="model.IdRol" />
+                                }
+                                else
+                                {
+                                    <RadzenLabel Text="Cargando roles..." />
+                                }
+                            </ChildContent>
+                            <Helper>
+                                <RadzenRequiredValidator Component="rol" Text="Es requerido selección."></RadzenRequiredValidator>
+                            </Helper>
+                        </RadzenFormField>
+                    </div>
+            </RadzenStack>
+            <RadzenStack Orientation="Orientation.Vertical" JustifyContent="JustifyContent.Right">
+                    <RadzenButton ButtonType="ButtonType.Submit" Text="Guardar" Style="margin-top:20px;" />
+                    @if (access == null)
+                    {
+                        <RadzenLabel Text="Modo: Crear nuevo acceso" TextStyle="TextStyle.Body1"></RadzenLabel>
+                    }
+                    else
+                    {
+                        <RadzenLabel Text="Modo: Editar acceso existente" TextStyle="TextStyle.Body1"></RadzenLabel>
+                    }
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+</RadzenCard>
+</RadzenTemplateForm>
+@code {
+    // [Parameter]
+    // public int? id { get; set; }
+    [Parameter]
+    public AccesoUsuarioDTO? access { get; set; }
+    [Inject]
+    DialogService DialogService { get; set; }
+    Variant variant = Variant.Flat;
+
+    /*model*/
+    private AccesoUsuarioDTO model = new();
+
+    /*Lists*/
+    private List<AreaDTO> areas = new();
+    private List<RolDTO> roles = new();
+    private List<EmplegenDTO> empleados = new();
+    private EmplegenDTO selectedEmpleado = new();
+
+    private bool isUpdate = false;
+
+    private string EmployeeImagePath => !string.IsNullOrEmpty(access?.IdEmpleado.ToString())
+            ? $"/employees/{access.IdEmpleado}.jpg"
+            : "/employees/default.jpg";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerEmpleados();
+        await ObtenerAreas();
+        await ObtenerRol();
+        await LoadData();
+    }
+
+    void Close(bool result)
+    {
+        Console.WriteLine("CERRANDO DESDE EL DIALOG...");
+        DialogService.Close(result); //el true devuel resultado al padre (quie abre el dialog)
+    }
+    /******ObtenerEmpleados******/
+    private async Task ObtenerEmpleados()
+    {
+        try
+        {
+            var response = await _emplegenServ.GetAll();
+            if(response.Any())
+            {
+                empleados = response.OrderBy(a => a.FullName).ToList() ?? new List<EmplegenDTO>();
+                await _js.InvokeVoidAsync("console.log", empleados);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            empleados = new List<EmplegenDTO>();
+        }
+    }
+    /******ObtenerAreas******/
+    private async Task ObtenerAreas()
+    {
+        try
+        {
+            var response = await _areaServ.GetAll();
+            if (response.Any())
+            {
+                areas = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            areas = new List<AreaDTO>();
+        }
+    }
+
+    /******ObtenerRol*******/
+    private async Task ObtenerRol()
+    {
+        try
+        {
+            var response = await _rolServ.GetAll();
+            if (response.Any())
+            {
+                roles = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            await _js.InvokeVoidAsync("console.lob", ex.Message);
+            Console.WriteLine(ex.Message);
+            roles = new List<RolDTO>();
+        }
+    }
+
+    private async Task GuardarCambios()
+    {
+        try
+        {
+            bool isSuccess = false;
+
+            if (isUpdate)
+            {
+                // Update devuelve bool directamente
+                isSuccess = await _accesoUsuario.Update(model);
+            }
+            else
+            {
+                // Create devuelve el DTO; es exitoso si no es nulo y tiene Id
+                var response = await _accesoUsuario.Create(model);
+                isSuccess = response != null && response.IdAcceso != 0;
+            }
+
+            // Evaluamos si la operación (crear o actualizar) fue exitosa
+            if (isSuccess)
+            {
+                Close(true);
+                model = new AccesoUsuarioDTO();
+                StateHasChanged();
+            }
+            else
+            {
+                // Opcional: Manejar el caso donde la API devolvió false o un objeto vacío
+                Close(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Close(false);
+        }
+    }
+
+
+    private async Task LoadData()
+    {
+        if (access == null)
+            return;
+
+        model.IdAcceso = access.IdAcceso;
+        model.IdEmpleado = access.IdEmpleado;
+        model.IdArea = access.IdArea;
+        model.IdRol = access.IdRol;
+        isUpdate = true;
+    }
+
+
+}
+

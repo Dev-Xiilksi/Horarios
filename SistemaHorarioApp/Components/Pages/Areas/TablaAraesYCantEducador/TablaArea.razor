@@ -1,0 +1,85 @@
+@inject IAccesoUsuarioService _accessUserServ
+@inject IJSRuntime _jsruntime
+<RadzenDataGrid @ref="gridAreas"
+                AllowFiltering="false"
+                FilterPopupRenderMode="PopupRenderMode.OnDemand"
+                AllowPaging="true"
+                PageSize="10"
+                AllowSorting="false"
+                Data="@Areas"
+                TItem="Item"
+                class="rz-shadow-1"
+                Style="z-index:0;">
+    <Columns>
+        <RadzenDataGridColumn Title="Area" Width="200px">
+            <Template Context="area">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.NoWrap">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-0">
+                        @area.NombreArea
+                        <RadzenBadge Shade="Shade.Lighter" Text="1" />
+                    </RadzenText>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn Width="50px" Property="Areas" Title="">
+            <Template Context="data">
+                <RadzenButton Variant="Variant.Flat" ButtonStyle="ButtonStyle.Primary" Shade="Shade.Lighter"
+                              Icon="arrow_forward" Click=@(() => IrArea(data.IdCoordinador.ToString())) />
+            </Template>
+        </RadzenDataGridColumn>
+                        
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [Parameter]
+    public string IdEmployee { get; set; } = "0";
+
+    RadzenDataGrid<Item> gridAreas;
+    IList<Item> Areas;
+    AccesoUsuarioDTO access = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetDataAccess();
+    }
+
+    /******Get data access******/
+    private async Task GetDataAccess()
+    {
+        try
+        {
+            var response = await _accessUserServ.GetAll();
+            if (response.Any())
+            {
+                access = response.FirstOrDefault(a => a.IdEmpleado == Convert.ToInt16(IdEmployee))!;
+                //area = access.IdArea;
+                Areas = response
+                        .Where(x => x.IdRol == 2)
+                        .Select(x => new Item
+                        {
+                            NombreArea = x.AreaName ?? "",
+                            IdCoordinador = x.IdEmpleado
+                        }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            access = new AccesoUsuarioDTO();
+        }
+    }
+
+    private async Task IrArea(string coordinador)
+    {
+        var url = $"/page/area/?i={coordinador}";
+        await _jsruntime.InvokeVoidAsync("abrirOtraPestaña", url);
+    }
+
+    class Item
+    {
+        public string NombreArea { get; set; } = "";
+        public int IdCoordinador { get; set; }
+    }
+}

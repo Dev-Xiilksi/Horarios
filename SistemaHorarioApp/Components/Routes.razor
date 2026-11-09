@@ -1,0 +1,30 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+@* IpCliente llega desde App.razor (peticion HTTP inicial) y se reparte a las paginas, p. ej. al login para limitar intentos *@
+<CascadingValue Name="IpCliente" Value="IpCliente">
+    <CascadingAuthenticationState>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                @* AuthorizeRouteView revisa [Authorize] tambien al navegar dentro de la app, no solo en la primera carga *@
+                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        @if (context.User.Identity?.IsAuthenticated != true)
+                        {
+                            <RedirectToLogin />
+                        }
+                        else
+                        {
+                            <SinPermiso />
+                        }
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+        </Router>
+    </CascadingAuthenticationState>
+</CascadingValue>
+
+@code {
+    [Parameter]
+    public string? IpCliente { get; set; }
+}

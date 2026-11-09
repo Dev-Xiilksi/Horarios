@@ -1,0 +1,171 @@
+﻿@using System.Globalization
+@inject IDataToChartsService _dataChartServ
+@inject IJSRuntime _js
+@* class="rz-p-0 rz-p-md-6 rz-p-lg-5" *@
+<RadzenStack Style="border:1px solid green;">
+    <RadzenRow>
+        <RadzenColumn Size="12">
+            <h4>Distribución de horas trabajadas</h4>
+            <RadzenStack class="rz-p-0 rz-p-md-6 rz-p-lg-12" AlignItems="AlignItems.Center">
+                <RadzenStack Style="width: 100%; max-width: 600px; border:1px solid white;">
+                    <RadzenChart class="" Style="width: 400px; height:300px;">
+                        <RadzenDonutSeries Data="@datosHoras" CategoryProperty="Tipo" ValueProperty="Horas" TotalAngle="360" StartAngle="220"
+                                           Fills="@(new[] { "#714169", "#F8A96E", "#F07474" })">
+                            <ChildContent>
+                                <RadzenSeriesDataLabels Visible="true" />
+                            </ChildContent>
+                        </RadzenDonutSeries>
+                    </RadzenChart>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public string? employee { get; set; }
+    private HorarioAuxDTO hourEducator = new();
+    private double hl = 0;
+    private double meetings = 0;
+    private double hnl = 0;
+
+
+
+    class DataItem
+    {
+        public string Tipo { get; set; }
+        public double Horas { get; set; }
+        public string Color { get; set; }
+    }
+
+    // Datos consolidados para el donut
+    DataItem[] datosHoras;
+
+    protected async override Task OnInitializedAsync()
+    {
+        await GetHourByEducator();
+        await ProcessHL();
+        await ProcessMeeting();
+        await ProcessHNL();
+        // Consolidar todas las horas por tipo
+        datosHoras = new DataItem[]
+        {
+            new DataItem
+            {
+                Tipo = $"HL",
+                Horas = hl, // Suma de horas lectiva
+            },
+             new DataItem
+            {
+                Tipo = $"Reuniones",
+                Horas = meetings, // Suma de horas reuniones
+            },
+            new DataItem
+            {
+                Tipo = $"HNL",
+                Horas = hnl, // Suma de horas no lectivas
+            },
+            // Puedes agregar más tipos si es necesario
+            // new DataItem
+            // {
+            //     Tipo = "Total",
+            //     Horas = 39.2, // Suma total de horas
+            //     Color = "#4BC0C0" // Verde turquesa
+            // }
+        };
+    }
+
+    // Formatear las etiquetas del donut
+    string FormatDonutLabel(object data, object category)
+    {
+        var item = data as DataItem;
+        if (item != null)
+        {
+            // Mostrar tipo, horas y porcentaje
+            double total = datosHoras.Sum(x => x.Horas);
+            double porcentaje = (item.Horas / total) * 100;
+
+            return $"{item.Tipo}: {FormatAsHours(item.Horas)} ({porcentaje:F1}%)";
+        }
+        return string.Empty;
+    }
+
+    // Formatear horas en formato legible
+    string FormatAsHours(double value)
+    {
+        int horas = (int)value;
+        int minutos = (int)((value - horas) * 60);
+
+        return $"{horas}h {minutos}m";
+    }
+
+    private async Task GetHourByEducator()
+    {
+        try
+        {
+            var response = await _dataChartServ.GetHour(employee!);
+            hourEducator = response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            hourEducator = new HorarioAuxDTO();
+        }
+    }
+    //------------------------------------------------------
+    private async Task ProcessHL()
+    {
+        TimeSpan total = TimeSpan.FromHours(40); // 100%
+        TimeSpan timeA = TimeSpan.Parse(hourEducator.Ia);
+        TimeSpan timeB = TimeSpan.Parse(hourEducator.Fmagis);
+
+        TimeSpan result = timeA.Add(timeB);
+        double p1 = (result.TotalHours / total.TotalHours) * 100;
+        hl = Math.Round(p1, 2);
+        Console.WriteLine(result);
+        Console.WriteLine(hl);
+    }
+    private async Task ProcessMeeting()
+    {
+        TimeSpan total = TimeSpan.FromHours(40);
+        TimeSpan timeA = TimeSpan.Parse(hourEducator.Rpersonal);
+        TimeSpan timeB = TimeSpan.Parse(hourEducator.Rarea);
+        TimeSpan timeC = TimeSpan.Parse(hourEducator.Rcomuni);
+        TimeSpan timeD = TimeSpan.Parse(hourEducator.Rorient);
+
+        TimeSpan result1 = timeA.Add(timeB);
+        TimeSpan result2 = timeC.Add(timeD);
+        TimeSpan resultTotal = result1.Add(result2);
+
+        double p2 = (resultTotal.TotalHours / total.TotalHours) * 100;
+        meetings = Math.Round(p2, 2);
+        Console.WriteLine(resultTotal);
+        Console.WriteLine(meetings);
+    }
+    private async Task ProcessHNL()
+    {
+        TimeSpan total = TimeSpan.FromHours(40);
+        // 1. Parse strings into TimeSpan objects
+        TimeSpan timeA = TimeSpan.Parse(hourEducator.Gaa!);
+        TimeSpan timeB = TimeSpan.Parse(hourEducator.Ora!);
+        TimeSpan timeC = TimeSpan.Parse(hourEducator.Alm!);
+        TimeSpan timeD = TimeSpan.Parse(hourEducator.Aaa!);
+        TimeSpan timeE = TimeSpan.Parse(hourEducator.Rtp!);
+        TimeSpan timeF = TimeSpan.Parse(hourEducator.Cuida!);
+        TimeSpan timeG = TimeSpan.Parse(hourEducator.Gao!);
+
+        // 2. Add them together
+        TimeSpan result1 = timeA.Add(timeB);
+        TimeSpan result2 = timeC.Add(timeD);
+        TimeSpan result3 = timeE.Add(timeF);
+        TimeSpan result4 = result1.Add(timeG);
+        TimeSpan result5 = result2.Add(result3);
+        TimeSpan resultTotal = result5.Add(result4);
+
+        double p3 = (resultTotal.TotalHours / total.TotalHours) * 100;
+        hnl = Math.Round(p3, 2);
+        Console.WriteLine(resultTotal);
+        Console.WriteLine(hnl);
+    }
+}

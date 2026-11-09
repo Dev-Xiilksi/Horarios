@@ -1,0 +1,10 @@
+@using SistemaHorario.Application.DTOs
+@using SistemaHorario.Application.DTOs.Auxiliares
+@using SistemaHorario.Application.Interfaces
+@using MediatR
+@using SistemaHorario.Application.UseCases.Horario.Commands
+@using SistemaHorario.Application.UseCases.Horario.Queries
+@using Microsoft.AspNetCore.Authorization
+@using SistemaHorario.Domain.Constants
+@* toda pantalla de dialogo requiere sesion *@
+@attribute [Authorize]

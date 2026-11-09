@@ -1,0 +1,20 @@
+@inject IReporteService _reportServ
+@inject IExcelHorarioService _excelHourServ
+@inject IJSRuntime _jsruntime
+
+<RadzenButton Click="() => ObtenerConsolidado()">Obtener consolidados</RadzenButton>
+@code {
+    private string ciclo = DateTime.Now.Year.ToString();
+
+
+    //Obtiene todos los consolidados por ciclo actual para descargarlos por el admin o consultor
+    private async Task ObtenerConsolidado()
+    {
+        var consolidados = await _reportServ.ObtenerConsolidados(ciclo);
+        byte[] excel = _excelHourServ.GenerarExcelConsolidados(consolidados);
+
+        var nombreArchivo = $"Consolidado_{ciclo}.xlsx";
+        var base64 = Convert.ToBase64String(excel);
+        await _jsruntime.InvokeVoidAsync("downloadFileFromBytes", nombreArchivo, base64);
+    }
+}

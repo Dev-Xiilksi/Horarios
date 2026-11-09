@@ -1,0 +1,41 @@
+﻿@page "/page/home"
+@using Microsoft.AspNetCore.Components.Authorization
+@using SistemaHorarioApp.Components.Pages.Inicio
+@using SistemaHorarioApp.Dialog
+@inject DialogService _dialogService
+@inject NotificationService notificationService
+
+
+<!-- VISTA EDUCADOR -->
+<AuthorizeView Roles="@RolesSistema.Educador">
+    <Authorized>
+        <InicioEducador></InicioEducador>
+    </Authorized>
+</AuthorizeView>
+
+<!-- VISTA COORDINADOR -->
+<AuthorizeView Roles="@RolesSistema.Coordinador">
+    <Authorized>
+        <InicioCoordinador></InicioCoordinador>
+    </Authorized>
+</AuthorizeView>
+
+<!-- VISTA ADMINITRADOR y CONSULTOR-->
+<AuthorizeView Roles="@($"{RolesSistema.Administrador},{RolesSistema.Consultor}")">
+    <Authorized>
+        <InicioAdminConsultor></InicioAdminConsultor>
+    </Authorized>
+</AuthorizeView>
+<RadzenFab Style="background-color:#CC1243; position:fixed;" Icon="info" Text="" Click=@ShowInlineDialog />
+@* </RadzenCard> *@
+
+@code {    
+
+    private async Task ShowInlineDialog()
+    {
+        var result = await _dialogService.OpenAsync<DialogInformacionGeneral>(
+             $"Sobre horarios"
+        );
+        StateHasChanged();
+    }
+}

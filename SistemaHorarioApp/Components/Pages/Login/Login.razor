@@ -1,0 +1,169 @@
+﻿@page "/"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Components.Authorization
+@using SistemaHorarioApp.Components.Layout
+@using SistemaHorarioApp.Seguridad
+@inject NavigationManager navManager
+@inject ILoginService _service
+@inject LoginTicketStore _tickets
+@inject SweetAlertService _swal
+@rendermode InteractiveServer
+@* isolated *@
+@inject AuthenticationStateProvider autenticacionProvider
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card rounded-lg mt-5">
+                @if (isLoading)
+                {
+                    <div>
+                        <RadzenProgressBar ProgressBarStyle="ProgressBarStyle.Primary" Value="@progress" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                    </div>
+                }
+
+                <div class="card-header"><h3 class="text-center font-weight-light my-4">Inicio de sesión</h3></div>
+                <div class="d-flex justify-content-center">
+                    <img class="m-2" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQwUkLNAtQMhBAaODLmVBM88qejId_oZAjRZA&s.jpg"
+                         alt="logo.liceojavier" width="70" height="80">
+                </div>
+                <div class="card-body">
+                    <EditForm Model="login" OnValidSubmit="IniciarSesion" FormName="loginForm">
+
+                        <DataAnnotationsValidator></DataAnnotationsValidator>
+                        <div class="form-floating mb-3">
+                            <input class="form-control" id="inputEmail" type="text" placeholder="admin@example.com" @bind-value="login.UserName" autocomplete="off" />
+                            <label for="inputEmail">Usuario</label>
+                            <span class="material-symbols-outlined btn btn-link position-absolute end-0 top-50 translate-middle-y" style="z-index: 10;">
+                                account_circle
+                            </span>
+                            <ValidationMessage For="@(() => login.UserName)" />
+                        </div>
+
+                        <div class="form-floating mb-3 position-relative">
+                            <input class="form-control" id="inputPassword" type="@passwordInputType" placeholder="123" @bind-value="login.Password" autocomplete="off" />
+                            <label for="inputPassword">Contraseña</label>
+                            <button type="button" class="btn btn-link position-absolute end-0 top-50 translate-middle-y" style="z-index: 10;" @onclick="TogglePasswordVisibility">
+                                <span class="material-symbols-outlined">@passwordIcon</span>
+                            </button>
+                            <ValidationMessage For="@(() => login.Password)" />
+                        </div>
+
+                        <div class="d-grid gap-1 mt-4 mb-0">
+                            <button class="btn btn-primary" type="submit">INICIAR SESION</button>
+                        </div>
+                    </EditForm>
+                </div>
+                <div class="card-footer text-center py-3">
+                    <div class="small">Ingrese con credenciales de dominio para iniciar sesión.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter(Name = "IpCliente")]
+    public string? IpCliente { get; set; }
+
+    private LoginRequestDTO login = new LoginRequestDTO();
+    private bool isLoading = false;
+    private int progress = 0;
+    private string passwordInputType = "password";
+    private string passwordIcon = "visibility";
+    private bool debeRedirigir;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await autenticacionProvider.GetAuthenticationStateAsync();
+
+        debeRedirigir = auth.User.Identity?.IsAuthenticated == true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && debeRedirigir)
+        {
+            navManager.NavigateTo("/page/home");
+        }
+    }
+
+    //Permite mostrar la contraseña
+    private void TogglePasswordVisibility()
+    {
+        if (passwordInputType == "password")
+        {
+            passwordInputType = "text";
+            passwordIcon = "visibility_off";
+        }
+        else
+        {
+            passwordInputType = "password";
+            passwordIcon = "visibility";
+        }
+    }
+
+    private async Task IniciarSesion()
+    {
+        //var obj = await _service.Login(login);
+
+        // 1. ACTIVAR loading ANTES de llamar al servicio
+        isLoading = true;
+        progress = 100;
+        
+        // 2. Forzar actualización de la UI
+        StateHasChanged();
+        await Task.Delay(200);
+
+        LoginDTO? obj;
+        try
+        {
+            obj = await _service.Login(login, IpCliente);
+        }
+        catch
+        {
+            //el detalle ya quedo registrado por LoginService
+            await MostrarAviso("No se pudo iniciar sesión. Intente de nuevo en unos minutos.");
+            return;
+        }
+
+        //null: credenciales validas pero sin acceso registrado (p. ej. maestro sin rol asignado)
+        if (obj == null || !obj.IsAuthenticated)
+        {
+            await MostrarAviso(obj?.Message ?? "No tienes permiso para acceder.");
+            return;
+        }
+
+        //la sesion queda en el servidor; a la pagina que crea la cookie solo viaja un ticket de un solo uso
+        var ticket = _tickets.Emitir(obj);
+        navManager.NavigateTo($"/Account/Login?ticket={ticket}", true);
+    }
+
+    private async Task MostrarAviso(string? mensaje)
+    {
+        await _swal.FireAsync("¡Atención!", mensaje ?? "Credenciales incorrectas.", SweetAlertIcon.Info);
+        isLoading = false;
+        progress = 0;
+    }
+
+    // 10. Simular progreso para mejor experiencia de usuario
+    private async Task SimularProgreso()
+    {
+        try
+        {
+            var random = new Random();
+            while (progress < 90 && isLoading)
+            {
+                progress += random.Next(5, 15);
+                if (progress > 90) progress = 90;
+                StateHasChanged();
+                await Task.Delay(200);
+            }
+        }
+        catch
+        {
+            // Ignorar errores de simulación
+        }
+    }
+}

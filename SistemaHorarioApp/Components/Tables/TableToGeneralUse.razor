@@ -1,0 +1,70 @@
+﻿@typeparam T
+<RadzenCard>
+    <div class="mb-3">
+        <input type="text"
+               class="form-control"
+               placeholder="Buscar..."
+               @bind="searchTerm"
+               @bind:event="oninput"
+               @onkeyup="Filter" />
+    </div>
+    @if (filteredItems == null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else if (!filteredItems.Any())
+    {
+        <p><em>No se encontraron registros.</em></p>
+    }
+    else
+    {
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                @HeaderTemplate
+            </thead>
+            <tbody>
+                @foreach (var item in filteredItems)
+                {
+                    @RowTemplate(item)
+                }
+            </tbody>
+        </table>
+
+        <p class="text-muted">Mostrando @filteredItems.Count() de @Items.Count() Accesos</p>
+    }
+
+</RadzenCard>
+
+@code {
+    [Parameter] public IEnumerable<T>? Items { get; set; }
+    [Parameter] public Func<T, string>? FilterSelector { get; set; }
+    [Parameter] public RenderFragment<T>? RowTemplate { get; set; }
+    [Parameter] public RenderFragment? HeaderTemplate { get; set; }
+
+
+    private List<T>? filteredItems;
+    private string? searchTerm;
+    protected override void OnParametersSet()
+    {
+        filteredItems = Items?.ToList();
+    }
+
+    private void Filter()
+    {
+        if (Items == null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredItems = Items.ToList();
+        }
+        else
+        {
+            filteredItems = Items
+                .Where(x =>
+                    FilterSelector?.Invoke(x)?
+                    .Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
+        }
+    }
+}

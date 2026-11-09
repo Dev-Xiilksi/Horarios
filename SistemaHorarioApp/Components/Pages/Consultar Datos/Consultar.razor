@@ -1,0 +1,863 @@
+﻿@attribute [Authorize]
+@page "/page/horario"
+@using Microsoft.AspNetCore.Authorization
+@using SistemaHorarioApp.Components.Layout
+@layout BlankLayout
+@inject NavigationManager _nav
+@inject IHrGeneralService _generalServ
+@inject IHrGeneral2Service _general2Serv
+@inject ISender _sender
+@inject IColegioService _colegioServ
+@inject INivelesService _nivelServ
+@inject IGradosService _gradoServ
+@inject IAreaService _areaServ
+@inject IEmplegenService _emplegenServ
+@inject IDiasService _diaServ
+@inject IHrActividadesService _actividadServ
+@inject IMaestrosPorSeccionService _maestroServ
+@inject IListadoHorarioColaboradorService _listadoHC
+@inject IHrVariableService _horarioVariableServ
+@inject IReporteService _reportServ
+@inject IHrGradosService _hrGradoService
+@* SweetAlert *@
+@inject SweetAlertService _swal
+@* para incrustar codigo javascript, como el console.log() *@
+@inject IJSRuntime _jsruntime
+
+@* card *@
+<RadzenStack JustifyContent="JustifyContent.Center" Orientation="Orientation.Horizontal" Style="width:100%; ">
+    <RadzenCard style="width:95%;">
+
+        @* CARD TO PROFESSOR'S PROFILE *@
+        <RadzenCard Style="margin-bottom:5px;" class="rz-p-0">
+            <div class="rz-p-0 rz-p-md-0 bg-white">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Start" Gap="1rem" class="rz-p-1">
+                    <div class="photo-emplyee" style="height:100px;width:70px;">
+                        <img src="@($"/employees/{empleado}.jpg")" alt="Logo"
+                             onerror="this.src='/employees/profile-picture.png'"
+                             style="width:100%;height:100%; border-radius:5px; border:1px solid #cecece;" />
+                    </div>
+                    <RadzenStack Gap="0">
+                        <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-0 rz-my-0">@NombreArea</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2"><b>@(NombreEducador) @((empleado))</b></RadzenText>
+                        @if (esAprobado == 1)
+                        {
+                            <RadzenChip Icon="check_circle" Text="Aprobado" ChipStyle="BadgeStyle.Success" Style="width:100px; font-weight:100;font-size:0.8rem;" />
+                        }
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+        </RadzenCard>
+
+        @* CARD TO DATA TABLE *@
+        <RadzenCard style="margin-bottom:5px; overflow: auto; box-shadow:none; ">
+            <div class="table-container">
+                <table class="table table-striped table-bordered">
+                    <thead style="background-color:#212529; position: sticky; top: 0; color:white; ">
+                        <tr>
+                            <th style="font-weight: 200;width: 150px;">Lunes</th>
+                            <th style="font-weight: 200;width: 150px;">Martes</th>
+                            <th style="font-weight: 200;width: 150px;">Miércoles</th>
+                            <th style="font-weight: 200;width: 150px;">Jueves</th>
+                            <th style="font-weight: 200;width: 150px;">Viernes</th>
+                            <th style="font-weight: 200;width: 150px;">Sábado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @* -----DIAS DE LA SEMANA----- *@
+                        @foreach (var (items, index) in detalles.Select((item, i) => (item, i)))
+                        {
+                            <tr>
+                                <td>
+                                    @* MONDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniLunesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinLunesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+
+
+                                    <RadzenFormField Style="width:100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                            Name="@($"activityLunes_{index}")"
+                                                            Class="fixed-dropdown"
+                                                            TextProperty="Name"
+                                                            ValueProperty="Id"
+                                                            @bind-Value="@items.LunesActividadId"
+                                                            Change="@(AssemblyLoadEventArgs => RecalcularHoras())"
+                                                            PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenRequiredValidator Component="@($"activityLunes_{index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </td>
+                                <td>
+                                    @* TUESDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniMartesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinMartesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+
+                                    <RadzenFormField Style="width:100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                            Name="@($"activityMartes_{index}")"
+                                                            Class="fixed-dropdown"
+                                                            TextProperty="Name"
+                                                            ValueProperty="Id"
+                                                            @bind-Value="@items.MartesActividadId"
+                                                            Change="@(AssemblyLoadEventArgs => RecalcularHoras())"
+                                                            PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenRequiredValidator Component="@($"activityMartes_{index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </td>
+                                <td>
+                                    @* WEDNESDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniMiercolesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinMiercolesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small"
+                                                                  Name="RadzenTimeSpanPickerMinMax"
+                                                                  Min="@TimeSpan.Zero"
+                                                                  Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+                                    <RadzenFormField Style="width:100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                            Name="@($"activityMiercoles_{index}")"
+                                                            Class="fixed-dropdown"
+                                                            TextProperty="Name"
+                                                            ValueProperty="Id"
+                                                            @bind-Value="@items.MiercolesActividadId"
+                                                            Change="@(AssemblyLoadEventArgs => RecalcularHoras())"
+                                                            PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenRequiredValidator Component="@($"activityMiercoles_{index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </td>
+                                <td>
+                                    @* THURSDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniJuevesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinJuevesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+                                    <RadzenFormField Style="width:100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                            Name="@($"activityJueves_{index}")"
+                                                            Class="fixed-dropdown"
+                                                            TextProperty="Name"
+                                                            ValueProperty="Id"
+                                                            @bind-Value="@items.JuevesActividadId"
+                                                            Change="@(AssemblyLoadEventArgs => RecalcularHoras())"
+                                                            PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenRequiredValidator Component="@($"activityJueves_{index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </td>
+                                <td>
+                                    @* FRIDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniViernesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinViernesT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+
+                                    <RadzenFormField Style="width:100%;">
+                                        <ChildContent>
+                                            <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                            Name="@($"activityViernes_{index}")"
+                                                            Class="fixed-dropdown"
+                                                            TextProperty="Name"
+                                                            ValueProperty="Id"
+                                                            @bind-Value="@items.ViernesActividadId"
+                                                            Change="@(AssemblyLoadEventArgs => RecalcularHoras())"
+                                                            PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenRequiredValidator Component="@($"activityViernes_{index}")" Text="Es requerido selección."></RadzenRequiredValidator>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </td>
+                                <td>
+                                    @* SATURDAY *@
+                                    <RadzenStack Orientation="Orientation.Horizontal">
+                                        <RadzenFormField Text="Inicia">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraIniSabadosT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+
+                                        <RadzenFormField Text="Termina">
+                                            <RadzenTimeSpanPicker @bind-Value="@items.HoraFinSabadosT" ShowPopupButton="false"
+                                                                  InputSize="InputSize.Small" Name="RadzenTimeSpanPickerMinMax" Min="@TimeSpan.Zero" Max="@TimeSpan.FromHours(24)" />
+                                        </RadzenFormField>
+                                    </RadzenStack>
+
+                                    <RadzenFormField Text="" Style="width:100%;">
+                                        <RadzenDropDown Data="@actividades" InputSize="InputSize.Small"
+                                                        Name="activitySabado"
+                                                        Class="fixed-dropdown"
+                                                        TextProperty="Name"
+                                                        ValueProperty="Id"
+                                                        @bind-Value="@items.SabadoActividadId"
+                                                        PopupStyle="min-width: 300px; max-height: 250px; overflow-y: auto; background-color:#fff;" />
+                                    </RadzenFormField>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!--Mostrar total de horas -->
+            @* <div class="mt-3">
+                    <strong style="font-weight:300;">Total de horas: @TotalHoras</strong>
+                </div> *@
+                
+        </RadzenCard>
+
+        @* CARD TO SUMMARY *@
+        <RadzenCard style="box-shadow:none;">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-p-2">
+                <RadzenLabel Text="Por tipo de actividad" TextStyle="TextStyle.Body2" Style="font-weight:bold; "></RadzenLabel>
+
+                <RadzenRadioButtonList TValue="int" @bind-Value="typeSelected" Change=@OnSelectionChange>
+                    <Items>
+                        <RadzenRadioButtonListItem Text="Lectivos" Value="1" />
+                        <RadzenRadioButtonListItem Text="No Lectivos" Value="2" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </RadzenStack>
+            <table class="table table-striped table-bordered">
+                <thead style="color:black; ">
+                    <tr>
+                        <th class="header-table" >Lunes</th>
+                        <th class="header-table" >Martes</th>
+                        <th class="header-table" >Miércoles</th>
+                        <th class="header-table" >Jueves</th>
+                        <th class="header-table" >Viernes</th>
+                        <th class="header-table" >Sábado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (items, index) in detalles.Select((item, i) => (item, i)))
+                    {
+                        <tr>
+                            <td class="td-table @GetClassHighlight(items.LunesActividadEsLectivo)">@items.HoraIniLunesT - @items.HoraFinLunesT (@CalcularTotalHoras(@items.HoraIniLunesT, @items.HoraFinLunesT))</td>
+                            <td class="td-table @GetClassHighlight(items.MartesActividadEsLectivo)">@items.HoraIniMartesT - @items.HoraFinMartesT (@CalcularTotalHoras(@items.HoraIniMartesT, @items.HoraFinMartesT))</td>
+                            <td class="td-table @GetClassHighlight(items.MiercolesActividadEsLectivo)">@items.HoraIniMiercolesT - @items.HoraFinMiercolesT (@CalcularTotalHoras(@items.HoraIniMiercolesT, @items.HoraFinMiercolesT))</td>
+                            <td class="td-table @GetClassHighlight(items.JuevesActividadEsLectivo)">@items.HoraIniJuevesT - @items.HoraFinJuevesT (@CalcularTotalHoras(@items.HoraIniJuevesT, @items.HoraFinJuevesT))</td>
+                            <td class="td-table @GetClassHighlight(items.ViernesActividadEsLectivo)">@items.HoraIniViernesT - @items.HoraFinViernesT (@CalcularTotalHoras(@items.HoraIniViernesT, @items.HoraFinViernesT))</td>
+                            <td class="td-table @GetClassHighlight(items.SabadoActividadEsLectivo)">@items.HoraIniSabadosT - @items.HoraFinSabadosT (@CalcularTotalHoras(@items.HoraIniSabadosT, @items.HoraFinSabadosT))</td>
+                        </tr>
+                        <tr>
+                            <td class="td-table @GetClassHighlight(items.LunesActividadEsLectivo)">@items.LunesActividadEsLectivo</td>
+                            <td class="td-table @GetClassHighlight(items.MartesActividadEsLectivo)">@items.MartesActividadEsLectivo</td>
+                            <td class="td-table @GetClassHighlight(items.MiercolesActividadEsLectivo)">@items.MiercolesActividadEsLectivo</td>
+                            <td class="td-table @GetClassHighlight(items.JuevesActividadEsLectivo)">@items.JuevesActividadEsLectivo</td>
+                            <td class="td-table @GetClassHighlight(items.ViernesActividadEsLectivo)">@items.ViernesActividadEsLectivo</td>
+                            <td class="td-table @GetClassHighlight(items.SabadoActividadEsLectivo)">@items.SabadoActividadEsLectivo</td>
+                        </tr>
+                    }
+                </tbody>
+
+            </table>
+
+            <RadzenStack class="rz-p-2">
+                <RadzenLabel Text="Consolidado" TextStyle="TextStyle.Body2" Style="font-weight:bold;"></RadzenLabel>
+            </RadzenStack>
+            <table class="table table-striped table-bordered">
+                <thead style="color:black; ">
+                    <tr>
+                        <th class="header-table">Imparte Asignatura</th>
+                        <th class="header-table">Actividades de Autocuidado y Aprecio Personal</th>
+                        <th class="header-table">Almuerzo / Refacción</th>
+                        <th class="header-table">Cuida Entrada, Recreo o Salida</th>
+                        <th class="header-table">Franja Magis</th>
+                        <th class="header-table">Gestión de Actividades de Acompañamiento</th>
+                        <th class="header-table">Gestión de Actividades de Orientación</th>
+                        <th class="header-table">Oración</th>
+                        <th class="header-table">Reunión Coordinador o Área</th>
+                        <th class="header-table">Reunión Comunidad Aprendizaje</th>
+                        <th class="header-table">Reunión con Orientador/a</th>
+                        <th class="header-table">Reunión Personal Coordinador</th>
+                        <th class="header-table">Revisa Trabajos y Planifica Trabajo Personal</th>
+                        <th class="header-table">Activida no Programada</th>
+                        <th class="header-table">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in consolidado)
+                    {
+                        <tr>
+                            <td style="text-align:center; font-size:10px;">@item.IA</td>
+                            <td style="text-align:center; font-size:10px;">@item.AAA</td>
+                            <td style="text-align:center; font-size:10px;">@item.ALM</td>
+                            <td style="text-align:center; font-size:10px;">@item.CUIDA</td>
+                            <td style="text-align:center; font-size:10px;">@item.FMAGIS</td>
+                            <td style="text-align:center; font-size:10px;">@item.GAA</td>
+                            <td style="text-align:center; font-size:10px;">@item.GAO</td>
+                            <td style="text-align:center; font-size:10px;">@item.ORA</td>
+                            <td style="text-align:center; font-size:10px;">@item.RAREA</td>
+                            <td style="text-align:center; font-size:10px;">@item.RCOMUNI</td>
+                            <td style="text-align:center; font-size:10px;">@item.RORIENT</td>
+                            <td style="text-align:center; font-size:10px;">@item.RPERSONAL</td>
+                            <td style="text-align:center; font-size:10px;">@item.RTP</td>
+                            <td style="text-align:center; font-size:10px;">@item.ANP</td>
+                            <td style="text-align:center; font-size:10px;">@item.TOTAL</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        </RadzenCard>
+    </RadzenCard>
+
+</RadzenStack>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "e")]
+    public int empleado { get; set; }
+
+    #region
+    string ciclo = DateTime.Now.Year.ToString();
+    TimeSpan lunesHora = new();
+    TimeSpan martesHora = new();
+    TimeSpan miercolesHora = new();
+    TimeSpan juevesHora = new();
+    TimeSpan viernesHora = new();
+    TimeSpan sabadosHora = new();
+    TimeSpan tiempoPorDia = new();
+    Variant variant = Variant.Outlined;
+
+    private string NombreEducador = "Cargando...";
+    private string NombreArea = "Cargando...";
+    private int esAprobado = 0;
+
+    private int typeSelected = 0; // 0 = nothing, 1 = HL and 2 = HNL
+
+    private HrHorario1DTO modelMain = new HrHorario1DTO();
+    private List<HorarioConsolidadoDto> consolidado = new();
+
+    private List<AreaDTO> areas = new List<AreaDTO>();
+    private List<EmplegenDTO> empleados = new List<EmplegenDTO>();
+    private List<DiaDTO> dias = new List<DiaDTO>();
+    private List<ActividadDTO> actividades = new List<ActividadDTO>();
+
+    private List<HrHorario2DTO> detalles = new();
+    private ActividadDTO? actividadSeleccionada;
+    private HrVariableDTO? selccionhorarioVariable;
+    private List<NivelDTO> niveles = new();
+    private List<GradoDTO> grados = new();
+
+    //private string TotalHoras => CalcularTotalHoras();
+    #endregion
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerEmpleados();
+        await ObtenerAreas();
+        await ObtenerDias();
+        await ObtenerActividades();
+        await ObtenereNiveles();
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private void OnSelectionChange(int value)
+    {
+        typeSelected = value;
+    }
+    private string GetClassHighlight(string isHL)
+    {
+        if (typeSelected == 1 && isHL == "Lectivo")
+            return "highlight-hl";
+
+        if(typeSelected == 2 && isHL == "No Lectivo")
+            return "highlight-nhl";
+
+        return string.Empty;
+    }
+
+    // private void OnHoraChange(object value)
+    // {
+    //     CalcularTotalHoras();
+    // }
+    /******Muestra el total de horas (8hrs)******/
+    private string CalcularTotalHoras(TimeSpan time1, TimeSpan time2)
+    {
+        string totalHours = "00:00:00";
+        totalHours = $"{time2 - time1}";
+        return totalHours;
+
+    }
+    /******Muestra en la tabla(columna 3) la diferencia entre horai y horaf******/
+    private void CalcularDiferencia(HrHorario2DTO item)
+    {
+        if (TimeSpan.TryParse(item.HoraIni, out var inicio) && TimeSpan.TryParse(item.HoraFin, out var fin))
+        {
+            var diferencia = fin - inicio;
+
+            if (diferencia.TotalMinutes > 0)
+            {
+                item.Tiempo = $"{(int)diferencia.TotalHours:D2}:{diferencia.Minutes:D2}";
+                tiempoPorDia = diferencia;
+            }
+            else
+            {
+                item.Tiempo = "00:00:00";
+            }
+        }
+        else
+        {
+            item.Tiempo = null;
+        }
+
+        StateHasChanged(); // actualiza la UI
+    }
+
+    /*******Esto permite el horario del dia por cada actividad seleccionada******/
+    private async Task RecalcularHoras()
+    {
+        lunesHora = TimeSpan.Zero;
+        martesHora = TimeSpan.Zero;
+        miercolesHora = TimeSpan.Zero;
+        juevesHora = TimeSpan.Zero;
+        viernesHora = TimeSpan.Zero;
+        sabadosHora = TimeSpan.Zero;
+
+        foreach (var item in detalles)
+        {
+            lunesHora += item.HoraFinLunesT - item.HoraIniLunesT;
+            martesHora += item.HoraFinMartesT - item.HoraIniMartesT;
+            miercolesHora += item.HoraFinMiercolesT - item.HoraIniMiercolesT;
+            juevesHora += item.HoraFinJuevesT - item.HoraIniJuevesT;
+            viernesHora += item.HoraFinViernesT - item.HoraIniViernesT;
+            sabadosHora += item.HoraFinSabadosT - item.HoraIniSabadosT;
+        }
+
+        StateHasChanged();
+    }
+
+
+
+    /******ObtenerEmpleados******/
+    private async Task ObtenerEmpleados()
+    {
+        try
+        {
+            var response = await _emplegenServ.GetAll();
+            if (response.Any())
+            {
+                empleados = response
+                    .OrderBy(a => a.FullName).ToList() ?? new List<EmplegenDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            empleados = new List<EmplegenDTO>();
+        }
+    }
+
+    /******NIVELES*******/
+    private async Task ObtenereNiveles()
+    {
+        try
+        {
+            var response = await _nivelServ.GetAll();
+            if (response.Any())
+            {
+                niveles = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading niveles: {ex.Message}");
+            niveles = new List<NivelDTO>();
+        }
+    }
+
+    /******Grados******/
+    private async Task ObtenerGrados(object nivel)
+    {
+        try
+        {
+            //await _jsruntime.InvokeVoidAsync("console.log", nivel);
+            var response = await _gradoServ.GetAll();
+            if (response.Any())
+            {
+                var lista = response;
+                //grados = lista.Where(a => a.Nivel == nivel.ToString()).ToList();
+
+                #region PorSiVieneVariosNiveles
+                var niveles = (nivel as IEnumerable<object>)
+                              ?.Select(n => n?.ToString() ?? "")
+                              .ToArray()
+                          ?? Array.Empty<string>();
+
+                grados = lista
+                    .Where(a => !string.IsNullOrEmpty(a.Nivel) &&
+                                niveles.Contains(a.Nivel)).ToList();
+                #endregion
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading grados: {ex.Message}");
+            grados = new List<GradoDTO>();
+        }
+    }
+
+    //Para obtener areas
+    private async Task ObtenerAreas()
+    {
+        var response = await _areaServ.GetAll();
+        if (response.Any())
+        {
+            areas = response;
+        }
+    }
+
+    //Para obtener dias
+    private async Task ObtenerDias()
+    {
+        var response = await _diaServ.GetAll();
+        if (response.Any())
+        {
+            dias = response;
+        }
+    }
+
+    //Para obtener actividades
+    private async Task ObtenerActividades()
+    {
+        try
+        {
+            var response = await _actividadServ.GetAll(Convert.ToInt32(empleado));
+            if (response.Any())
+            {
+                actividades = response;
+                actividadSeleccionada = actividades.FirstOrDefault();
+            }
+        }
+        catch (Exception ex)
+        {
+            actividades = new List<ActividadDTO>();
+        }
+    }
+
+    /*--------------Carga datos para el usuario pueda ver su franja--------------*/
+    /*****Permite cargar los datos del educador*****/
+    /*--------------Carga datos para el usuario pueda ver su franja--------------*/
+    /*****Permite cargar los datos del educador*****/
+    private async Task LoadData()
+    {
+        try
+        {
+            modelMain = new HrHorario1DTO();
+            var empleadoSeleccionado = empleados
+                .FirstOrDefault(a => a.Empleado == empleado);
+
+            if (empleadoSeleccionado == null)
+                return;
+
+            var hour1 = await _sender.Send(new ObtenerHorarioPorEmpleadoQuery(empleado.ToString(), ciclo));
+            if (hour1.IdHorario1 == 0)
+                return;
+
+            var hour2 = await _sender.Send(new ObtenerFranjasDelHorarioQuery(hour1.IdHorario1));
+
+            // 1. Poblar encabezado
+            modelMain.IdHrg1 = hour1.IdHrg1;
+            modelMain.Area = hour1.Area;
+            esAprobado = hour1.IdConfirmacion;
+            NombreEducador = empleados.Where(a => a.Empleado == empleado)
+                                .Select(a => a.FullName)
+                                .FirstOrDefault() ?? "Unknown";
+
+            NombreArea = areas.Where(a => a.Areas == modelMain.Area)
+                            .Select(a => a.Nombre)
+                            .FirstOrDefault() ?? "Unknown";
+
+            var listaConsolidados = await _reportServ.ObtenerConsolidadoPorArea(modelMain.Area.ToString(), ciclo);
+            consolidado = listaConsolidados.Where(a => a.Codigo == empleado.ToString()).ToList();
+
+            modelMain.Nivel = hour1.Nivel;
+            modelMain.Grado = hour1.Grado;
+
+            var hrgrados = await _hrGradoService.ObtenerGrados(hour1.IdHorario1);
+            modelMain.Nivels = hrgrados.Select(a => a.Nivel).ToList();
+            await ObtenerGrados(modelMain.Nivels);
+            modelMain.Grados = hrgrados.Select(a => a.NivelGrado).ToList();
+
+            // await _jsruntime.InvokeVoidAsync("console.log", hrgrados);
+
+            // 2. Traer detalles guardados
+            if (!hour2.Any()) return;
+
+            // 3. Agrupar por fila — cada fila tiene su propio rango horario (Horai/Horaf)
+            //    En variable NO hay IdHrg2, se agrupa por Horai+Horaf
+            var filas = hour2
+                .GroupBy(x => new { x.Horai, x.Horaf })
+                .ToList();
+
+            detalles.Clear();
+
+            // 1. Agrupar por día, ordenar cada día por hora de inicio
+            var porDia = hour2
+                .GroupBy(x => x.Dia)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderBy(x => TimeSpan.TryParse(x.Horai, out var t) ? t : TimeSpan.Zero).ToList()
+                );
+
+            // 2. La cantidad de filas = el día que tenga más actividades
+            int maxFilas = porDia.Any() ? porDia.Values.Max(l => l.Count) : 0;
+
+            // 3. Armar cada fila tomando la actividad N de cada día (si existe)
+            for (int i = 0; i < maxFilas; i++)
+            {
+                var nuevaFila = new HrHorario2DTO();
+
+                void AsignarDia(int dia, Action<TimeSpan, TimeSpan, int?, string> asignar)
+                {
+                    if (porDia.TryGetValue(Convert.ToInt16(dia), out var lista) && i < lista.Count)
+                    {
+                        var item = lista[i];
+                        var ini = TimeSpan.TryParse(item.Horai, out var h1) ? h1 : TimeSpan.Zero;
+                        var fin = TimeSpan.TryParse(item.Horaf, out var h2) ? h2 : TimeSpan.Zero;
+                        var actividadId = item.IdMps ?? (int?)item.IdHra;
+                        var esLectivo = item.IdMps == null ? "No Lectivo" : "Lectivo";
+                        asignar(ini, fin, actividadId, esLectivo);
+                    }
+                }
+
+                AsignarDia(1, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniLunesT = ini;
+                    nuevaFila.HoraFinLunesT = fin;
+                    nuevaFila.LunesActividadId = act;
+                    nuevaFila.LunesActividadEsLectivo = esLectivo;
+                });
+
+                AsignarDia(2, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniMartesT = ini;
+                    nuevaFila.HoraFinMartesT = fin;
+                    nuevaFila.MartesActividadId = act;
+                    nuevaFila.MartesActividadEsLectivo = esLectivo;
+                });
+                AsignarDia(3, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniMiercolesT = ini;
+                    nuevaFila.HoraFinMiercolesT = fin;
+                    nuevaFila.MiercolesActividadId = act;
+                    nuevaFila.MiercolesActividadEsLectivo = esLectivo;
+                });
+                AsignarDia(4, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniJuevesT = ini;
+                    nuevaFila.HoraFinJuevesT = fin;
+                    nuevaFila.JuevesActividadId = act;
+                    nuevaFila.JuevesActividadEsLectivo = esLectivo;
+                });
+                AsignarDia(5, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniViernesT = ini;
+                    nuevaFila.HoraFinViernesT = fin;
+                    nuevaFila.ViernesActividadId = act;
+                    nuevaFila.ViernesActividadEsLectivo = esLectivo;
+                });
+                AsignarDia(6, (ini, fin, act, esLectivo) =>
+                {
+                    nuevaFila.HoraIniSabadosT = ini;
+                    nuevaFila.HoraFinSabadosT = fin;
+                    nuevaFila.SabadoActividadId = act;
+                    nuevaFila.SabadoActividadEsLectivo = esLectivo;
+                });
+
+                detalles.Add(nuevaFila);
+            }
+
+            StateHasChanged();
+
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error cargando datos!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+    private async Task LoadData1()
+    {
+        try
+        {
+            modelMain = new HrHorario1DTO();
+            var empleadoSeleccionado = empleados
+                .FirstOrDefault(a => a.Empleado == empleado);
+
+            if (empleadoSeleccionado == null)
+                return;
+
+            var hour1 = await _sender.Send(new ObtenerHorarioPorEmpleadoQuery(empleado.ToString(), ciclo));
+            if (hour1 == null)
+                return;
+
+            var hour2 = await _sender.Send(new ObtenerFranjasDelHorarioQuery(hour1.IdHorario1));
+
+            // 1. Poblar encabezado
+            modelMain.IdHrg1 = hour1.IdHrg1;
+            modelMain.Area = hour1.Area;
+            modelMain.Nivel = hour1.Nivel;
+            esAprobado = hour1.IdConfirmacion;
+
+            NombreEducador = empleados.Where(a => a.Empleado == empleado)
+                    .Select(a => a.FullName)
+                    .FirstOrDefault() ?? "Unknown";
+
+            NombreArea = areas.Where(a => a.Areas == modelMain.Area)
+                                        .Select(a => a.Nombre)
+                                        .FirstOrDefault() ?? "Unknown";
+
+            var hrgrados = await _hrGradoService.ObtenerGrados(hour1.IdHorario1);
+            modelMain.Nivels = hrgrados.Select(a => a.Nivel).ToList();
+            await ObtenerGrados(modelMain.Nivels);
+            modelMain.Grados = hrgrados.Select(a => a.NivelGrado).ToList();
+
+            // 2. Traer detalles guardados
+            if (!hour2.Any()) return;
+
+            // 3. Agrupar por fila — cada fila tiene su propio rango horario (Horai/Horaf)
+            //    En variable NO hay IdHrg2, se agrupa por Horai+Horaf
+
+            var filas = hour2
+                    .GroupBy(x => x.NumeroFila)
+                    .OrderBy(g => g.Key)
+                    .ToList();
+
+
+            // var filas = hour2
+            //     .GroupBy(x => new { x.Horai, x.Horaf })
+            //     .ToList();
+
+            detalles.Clear();
+
+            foreach (var grupo in filas)
+            {
+                var nuevaFila = new HrHorario2DTO();
+
+                foreach (var item in grupo)
+                {
+                    var actividadId = item.IdMps ?? (int?)item.IdHra;
+                    var ini = TimeSpan.TryParse(item.Horai, out var horaIni) ? horaIni : TimeSpan.Zero;
+                    var fin = TimeSpan.TryParse(item.Horaf, out var horaFin) ? horaFin : TimeSpan.Zero;
+
+                    switch (item.Dia)
+                    {
+                        case 1:
+                            nuevaFila.HoraIniLunesT = ini;
+                            nuevaFila.HoraFinLunesT = fin;
+                            nuevaFila.LunesActividadId = actividadId;
+                            break;
+                        case 2:
+                            nuevaFila.HoraIniMartesT = ini;
+                            nuevaFila.HoraFinMartesT = fin;
+                            nuevaFila.MartesActividadId = actividadId;
+                            break;
+                        case 3:
+                            nuevaFila.HoraIniMiercolesT = ini;
+                            nuevaFila.HoraFinMiercolesT = fin;
+                            nuevaFila.MiercolesActividadId = actividadId;
+                            break;
+                        case 4:
+                            nuevaFila.HoraIniJuevesT = ini;
+                            nuevaFila.HoraFinJuevesT = fin;
+                            nuevaFila.JuevesActividadId = actividadId;
+                            break;
+                        case 5:
+                            nuevaFila.HoraIniViernesT = ini;
+                            nuevaFila.HoraFinViernesT = fin;
+                            nuevaFila.ViernesActividadId = actividadId;
+                            break;
+                        case 6:
+                            nuevaFila.HoraIniSabadosT = ini;
+                            nuevaFila.HoraFinSabadosT = fin;
+                            nuevaFila.SabadoActividadId = actividadId;
+                            break;
+                    }
+                }
+
+                detalles.Add(nuevaFila);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error cargando datos!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+}
+
+}
+
+   

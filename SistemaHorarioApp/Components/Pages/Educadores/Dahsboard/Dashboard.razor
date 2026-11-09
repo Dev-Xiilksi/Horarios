@@ -1,0 +1,394 @@
+﻿@page "/dash"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using SistemaHorarioApp.Components.Layout
+@using SistemaHorarioApp.Components.Pages.Consultar_Datos.Components
+@layout LoginLayout
+@inject IReporteService _reportesService
+@inject IExcelHorarioService _excelHorarioService
+@inject ISender _sender
+@inject IDataToChartsService _dataToChar
+@inject IJSRuntime _jsruntime
+@inject IAccesoUsuarioService _accessUserServ
+@inject IGradosService _gradoServ
+@inject IAreaService _areaServ
+@inject IEmplegenService _emplegenServ
+@inject IHrGradosService _hrGradoService
+@inject AuthenticationStateProvider AuthProvider
+@inject SweetAlertService _swal
+
+<div style="padding:1rem 5rem 0 5rem;">
+    <!-- ===================== CABECERA ===================== -->
+    <div class="rz-mb-3">
+        <RadzenCard class="rz-my-0" Style="max-width: 420px;">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Start" Gap="1rem" class="rz-p-0">
+                <RadzenImage Path="@($"/employees/{empleado}.jpg")"
+                             Style="width: 70px; height: 90px; flex-shrink:0;"
+                             class="rz-border-radius-2"
+                             AlternateText="@(empleado.ToString())" />
+                <RadzenStack Gap="0">
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-1 rz-my-0">@NombreArea, @nombreRol</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body2"><b>@(NombreEducador) @((empleado))</b></RadzenText>
+                    <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-4 rz-mb-0">@textoConfirmar</RadzenText>
+
+                    <RadzenCard class="rz-shadow-0 rz-border-radius-0 rz-p-0" Visible="!esVisible" Variant="Variant.Flat" style="margin: 1rem calc(-1 * var(--rz-card-padding));">
+                        <RadzenRow RowGap="0">
+                            <RadzenColumn SizeSM="4">
+                                <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Text="@(modelMain.Fecha_Registro.ToShortDateString())" Size="ChipSize.Small"
+                                            Variant="Variant.Outlined" Style="color:#fff; border:1px solid #CC1243; background:#CC1243;" />
+                            </RadzenColumn>
+                            <RadzenColumn SizeSM="5">
+                                <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Text="@(tipoFranja.ToString())" Size="ChipSize.Small"
+                                            Variant="Variant.Outlined" Style="color:#fff; border:1px solid #CC1243; background:#CC1243;" />
+                            </RadzenColumn>
+                            <RadzenColumn SizeSM="4">
+                                @if (esAprobado)
+                                {
+                                    <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Size="ChipSize.Small"
+                                                Text="Aprobado" ChipStyle="BadgeStyle.Success" />
+                                }
+
+                            </RadzenColumn>
+                        </RadzenRow>
+                    </RadzenCard>
+
+                </RadzenStack>
+            </RadzenStack>
+
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0">
+                <RadzenButton Variant="Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Eliminar Horario" />
+                <RadzenButton Variant="Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Excel" />
+            </RadzenStack>
+        </RadzenCard>
+    </div>
+
+
+    <!-- ===================== TARJETAS RESUMEN ===================== -->
+    <div class="summary-grid rz-mb-3">
+        <RadzenCard class="summary-card">
+            <div class="summary-icon-label">
+                <RadzenIcon Icon="people"></RadzenIcon>
+            </div>
+            <div class="summary-label">Horas totales</div>
+            <div class="summary-value" style="color:#1a73e8;">40</div>
+        </RadzenCard>
+            
+        <RadzenCard class="summary-card">
+            <div class="summary-icon-label">
+                <RadzenIcon Icon="av_timer"></RadzenIcon>
+            </div>
+            <div class="summary-label">Horas lectivas</div>
+            <div class="summary-value" style="color:#28a745;">@Math.Round(TotalHorasLectivasEducador, 2)%</div>
+        </RadzenCard>
+
+        <RadzenCard class="summary-card">
+            <div class="summary-icon-label">
+                <RadzenIcon Icon="av_timer"></RadzenIcon>
+            </div>
+            <div class="summary-label">Horas no lectivas</div>
+            <div class="summary-value" style="color:#EF5C38;">@Math.Round(TotalHorasNoLectivasEducador, 2)%</div>
+        </RadzenCard>
+    </div>
+    <RadzenCard>
+        <ChartByEducator idEducator="@empleado" area="@area" ></ChartByEducator>
+    </RadzenCard>
+@*     <RadzenCard>
+        <ChartByEducator idEducator="@empleado" area="@area"></ChartByEducator>
+    </RadzenCard> *@
+</div>
+
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "e")]
+    public int empleado { get; set; }
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "a")]
+    public int area { get; set; }
+
+    string ciclo = DateTime.Now.Year.ToString();
+    TimeSpan lunesHora = new();
+    TimeSpan martesHora = new();
+    TimeSpan miercolesHora = new();
+    TimeSpan juevesHora = new();
+    TimeSpan viernesHora = new();
+    TimeSpan sabadosHora = new();
+    TimeSpan tiempoPorDia = new();
+
+    private string textoConfirmar = "";
+    private string NombreEducador = "Cargando...";
+    private string NombreArea = "Cargando...";
+    private string nombreRol = "";
+    private bool esAprobado = false;
+    private bool esVisible = false;
+    private string tipoFranja = "";
+
+    public double TotalHorasLectivasEducador { get; set; }
+    public double TotalHorasNoLectivasEducador { get; set; }
+
+    private HrHorario1DTO modelMain = new();
+    private List<EmplegenDTO> empleados = new();
+    private List<AreaDTO> areas = new();
+    private List<GradoDTO> grados = new();
+    private List<HrHorario2DTO> detalles = new();
+    private List<ActividadDTO> actividades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var obj = await AuthProvider.GetAuthenticationStateAsync();
+        var educadorLogeado = obj.User;
+        //nombreUsuario = educadorLogeado.Identity!.Name!;
+        //idEmpleado = educadorLogeado.FindFirst("idUser")?.Value;
+        //nombreArea = educadorLogeado.FindFirst("area")?.Value;
+        nombreRol = educadorLogeado.FindFirst(ClaimTypes.Role)?.Value;
+
+        await ObtenerEmpleados();
+        await ObtenerConsolidadoPorEducador();
+        await ObtenerAreas();
+        await LoadData();
+        //await GetHours();
+    }
+    //******ObtenerEmpleados******//
+    private async Task ObtenerEmpleados()
+    {
+        try
+        {
+            var response = await _emplegenServ.GetAll();
+            if (response.Any())
+            {
+                empleados = response
+                    .OrderBy(a => a.FullName).ToList() ?? new List<EmplegenDTO>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            empleados = new List<EmplegenDTO>();
+        }
+    }
+    //******Grados******//
+    private async Task ObtenerGrados(object nivel)
+    {
+        try
+        {
+            //await _jsruntime.InvokeVoidAsync("console.log", nivel);
+            var response = await _gradoServ.GetAll();
+            if (response.Any())
+            {
+                var lista = response;
+                //grados = lista.Where(a => a.Nivel == nivel.ToString()).ToList();
+
+                #region PorSiVieneVariosNiveles
+                var niveles = (nivel as IEnumerable<object>)
+                              ?.Select(n => n?.ToString() ?? "")
+                              .ToArray()
+                          ?? Array.Empty<string>();
+
+                grados = lista
+                    .Where(a => !string.IsNullOrEmpty(a.Nivel) &&
+                                niveles.Contains(a.Nivel)).ToList();
+                #endregion
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading grados: {ex.Message}");
+            grados = new List<GradoDTO>();
+        }
+    }
+    //*******areas******//
+    private async Task ObtenerAreas()
+    {
+        var response = await _areaServ.GetAll();
+        if (response.Any())
+        {
+            areas = response;
+        }
+    }
+    //*******Esto permite el horario del dia por cada actividad seleccionada******//
+    private async Task RecalcularHoras()
+    {
+        lunesHora = TimeSpan.Zero;
+        martesHora = TimeSpan.Zero;
+        miercolesHora = TimeSpan.Zero;
+        juevesHora = TimeSpan.Zero;
+        viernesHora = TimeSpan.Zero;
+        sabadosHora = TimeSpan.Zero;
+
+        foreach (var item in detalles)
+        {
+            lunesHora += item.HoraFinLunesT - item.HoraIniLunesT;
+            martesHora += item.HoraFinMartesT - item.HoraIniMartesT;
+            miercolesHora += item.HoraFinMiercolesT - item.HoraIniMiercolesT;
+            juevesHora += item.HoraFinJuevesT - item.HoraIniJuevesT;
+            viernesHora += item.HoraFinViernesT - item.HoraIniViernesT;
+            sabadosHora += item.HoraFinSabadosT - item.HoraIniSabadosT;
+        }
+        StateHasChanged();
+    }
+
+
+    /*
+ * Calcular hl y hnl del educador
+ */
+    private async Task ObtenerConsolidadoPorEducador()
+    {
+        var obj = await _dataToChar.OnlyHours(empleado.ToString());
+
+        List<TimeSpan> hl = new();
+        List<TimeSpan> hnl = new();
+
+        foreach (var item in obj)
+        {
+            hl.Add(TimeSpan.Parse(item.Ia));
+            hl.Add(TimeSpan.Parse(item.Fmagis));
+
+            hnl.Add(TimeSpan.Parse(item.Aaa));
+            hnl.Add(TimeSpan.Parse(item.Alm));
+            hnl.Add(TimeSpan.Parse(item.Cuida));
+            hnl.Add(TimeSpan.Parse(item.Gaa));
+            hnl.Add(TimeSpan.Parse(item.Gao));
+            hnl.Add(TimeSpan.Parse(item.Ora));
+            hnl.Add(TimeSpan.Parse(item.Rarea));
+            hnl.Add(TimeSpan.Parse(item.Rcomuni));
+            hnl.Add(TimeSpan.Parse(item.Rorient));
+            hnl.Add(TimeSpan.Parse(item.Rpersonal));
+            hnl.Add(TimeSpan.Parse(item.Rtp));
+            hnl.Add(TimeSpan.Parse(item.Anp));
+        }
+
+        TimeSpan totalHorasLectivas = hl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        TimeSpan totalHorasNoLectivas = hnl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        var HorasLectivas = TimeSpan.FromMinutes(totalHorasLectivas.TotalHours);
+        var HorasNoLectivas = TimeSpan.FromMinutes(totalHorasNoLectivas.TotalHours);
+
+        TimeSpan total = HorasLectivas + HorasNoLectivas;
+
+        TotalHorasLectivasEducador = Math.Round(HorasLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+        TotalHorasNoLectivasEducador = Math.Round(HorasNoLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+        StateHasChanged();
+        // Console.Write(TotalHorasLectivasEducador);   //17.28
+        // Console.Write(TotalHorasNoLectivasEducador); //82.72
+    }
+
+
+    /*****Permite cargar los datos del educador*****/
+    private async Task LoadData()
+    {
+        try
+        {
+            modelMain = new HrHorario1DTO();
+            var empleadoSeleccionado = empleados
+                .FirstOrDefault(a => a.Empleado == empleado);
+
+            if (empleadoSeleccionado == null)
+                return;
+
+            var hour1 = await _sender.Send(new ObtenerHorarioPorEmpleadoQuery(empleado.ToString(), ciclo));
+            if (hour1.IdHorario1 == 0)
+                return;
+
+            var hour2 = await _sender.Send(new ObtenerFranjasDelHorarioQuery(hour1.IdHorario1));
+
+            // 1. Poblar encabezado
+            modelMain.IdHrg1 = hour1.IdHrg1;
+            modelMain.Area = hour1.Area;
+            modelMain.Fecha_Registro = hour1.Fecha_Registro;
+            tipoFranja = hour1.TipoFranja == 1 ? "Horario Fijo" : "Horario Variable";
+            esAprobado = Convert.ToBoolean(hour1.IdConfirmacion);
+            NombreEducador = empleados.Where(a => a.Empleado == empleado)
+                                .Select(a => a.FullName)
+                                .FirstOrDefault() ?? "Unknown";
+
+            NombreArea = areas.Where(a => a.Areas == modelMain.Area)
+                            .Select(a => a.Nombre)
+                            .FirstOrDefault() ?? "Unknown";
+
+            modelMain.Nivel = hour1.Nivel;
+            modelMain.Grado = hour1.Grado;
+
+            var hrgrados = await _hrGradoService.ObtenerGrados(hour1.IdHorario1);
+            modelMain.Nivels = hrgrados.Select(a => a.Nivel).ToList();
+            await ObtenerGrados(modelMain.Nivels);
+            modelMain.Grados = hrgrados.Select(a => a.NivelGrado).ToList();
+
+            // await _jsruntime.InvokeVoidAsync("console.log", hrgrados);
+
+
+            // 2. Traer detalles guardados
+            if (!hour2.Any()) return;
+
+            // 3. Agrupar por fila — cada fila tiene su propio rango horario (Horai/Horaf)
+            //    En variable NO hay IdHrg2, se agrupa por Horai+Horaf
+            var filas = hour2
+                .GroupBy(x => new { x.Horai, x.Horaf })
+                .ToList();
+
+            detalles.Clear();
+
+            foreach (var grupo in filas)
+            {
+                var nuevaFila = new HrHorario2DTO
+                {
+                    HoraInicio = TimeSpan.TryParse(grupo.Key.Horai, out var ini) ? ini : TimeSpan.Zero,
+                    HoraFinal = TimeSpan.TryParse(grupo.Key.Horaf, out var fin) ? fin : TimeSpan.Zero,
+                };
+
+                var diff = nuevaFila.HoraFinal - nuevaFila.HoraInicio;
+                nuevaFila.Tiempo = diff.TotalMinutes > 0
+                    ? $"{(int)diff.TotalHours:D2}:{diff.Minutes:D2}"
+                    : "00:00";
+
+                foreach (var item in grupo)
+                {
+                    var actividadId = item.IdMps ?? (int?)item.IdHra;
+                    var horaInicial = item.Horai;
+                    var horaFinal = item.Horaf;
+
+                    switch (item.Dia)
+                    {
+                        case 1:
+                            nuevaFila.HoraIniLunesT = TimeSpan.Parse(grupo.Key.Horai);
+                            nuevaFila.HoraFinLunesT = TimeSpan.Parse(grupo.Key.Horaf);
+                            nuevaFila.LunesActividadId = actividadId;
+                            break;
+                        case 2:
+                            nuevaFila.HoraIniMartesT = TimeSpan.Parse(grupo.Key.Horai);
+                            nuevaFila.HoraFinMartesT = TimeSpan.Parse(grupo.Key.Horaf);
+                            nuevaFila.MartesActividadId = actividadId;
+                            break;
+                        case 3:
+                            nuevaFila.HoraIniMiercolesT = TimeSpan.Parse(grupo.Key.Horai); ;
+                            nuevaFila.HoraFinMiercolesT = TimeSpan.Parse(grupo.Key.Horaf); ;
+                            nuevaFila.MiercolesActividadId = actividadId;
+                            break;
+                        case 4:
+                            nuevaFila.HoraIniJuevesT = TimeSpan.Parse(grupo.Key.Horai);
+                            nuevaFila.HoraFinJuevesT = TimeSpan.Parse(grupo.Key.Horaf);
+                            nuevaFila.JuevesActividadId = actividadId;
+                            break;
+                        case 5:
+                            nuevaFila.HoraIniViernesT = TimeSpan.Parse(grupo.Key.Horai);
+                            nuevaFila.HoraFinViernesT = TimeSpan.Parse(grupo.Key.Horaf);
+                            nuevaFila.ViernesActividadId = actividadId;
+                            break;
+                        case 6:
+                            nuevaFila.HoraIniSabadosT = TimeSpan.Parse(grupo.Key.Horai);
+                            nuevaFila.HoraFinSabadosT = TimeSpan.Parse(grupo.Key.Horaf);
+                            nuevaFila.SabadoActividadId = actividadId;
+                            break;
+                    }
+                }
+
+                detalles.Add(nuevaFila);
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("¡Error cargando datos!", ex.Message, SweetAlertIcon.Error);
+        }
+    }
+}

@@ -1,0 +1,128 @@
+﻿@inherits LayoutComponentBase
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization;
+@using SistemaHorarioApp.Dialog
+@inject AuthenticationStateProvider autenticacionProvider
+@inject NavigationManager navManager
+
+@inject DialogService _dialogService
+ @* ESTE ES IMPORTANTE PARA ABRIR DIALOGS *@
+@inject NotificationService NotificationService
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4" style="background-color:white;">
+            <AuthorizeView Roles="@RolesSistema.Administrador">
+                <Authorized>
+                    @* CONTENDOR DE APPS *@
+                    <div class="apps-container">
+                        <button class="apps-btn" @onclick="ToggleApps">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM16,6c0,1.1 0.9,2 2,2s2,-0.9 2,-2 -0.9,-2 -2,-2 -2,0.9 -2,2zM12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2z" />
+                            </svg>
+                        </button>
+
+                        @if (_showApps)
+                        {
+                            <div class="apps-overlay" @onclick="CloseApps">
+                                <div class="apps-panel" @onclick:stopPropagation="true">
+                                    <div class="apps-header">
+                                        <h3>Otros</h3>
+                                        <button class="close-btn" @onclick="CloseApps">×</button>
+                                    </div>
+
+                                    <div class="apps-grid">
+                                        @foreach (var app in _anotherApps)
+                                        {
+                                            <div class="app-item" @onclick="() => NavigateToApp(app.Url)">
+
+                                                <div class="app-icon">
+                                                    <span class="material-symbols-outlined">
+                                                        @app.Icon
+                                                    </span>
+                                                </div>
+                                                <span class="app-name">@app.Name</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+            
+
+            @* CERRAR SESION *@
+            <form method="post" action="Account/Logout" class="d-inline">
+                <AntiforgeryToken />
+                <button type="submit" class="btn btn-link p-0 text-reset" title="Cerrar sesión" aria-label="Cerrar sesión">
+                    <span class="material-symbols-outlined">
+                        login
+                    </span>
+                </button>
+            </form>
+        </div>
+
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+<RadzenNotification />
+<RadzenDialog />
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; }
+    private bool _showApps = false;
+
+    private class AppItem
+    {
+        public string Name { get; set; }
+        public string Icon { get; set; }
+        public string Url { get; set; }
+    }
+    private List<AppItem> _anotherApps = new()
+    {
+        new AppItem { Name = "Inicio", Icon = "home", Url = "page/home" },
+        new AppItem { Name = "Acceso", Icon = "lock_person", Url = "/acceso-usuario" },
+        new AppItem { Name = "Registro de educadores", Icon = "manage_search", Url = "/registro-colaboradores" },
+        new AppItem { Name = "Mantenimiento de correos", Icon = "alternate_email", Url = "/email" },
+    };
+    private void NavigateToApp(string url)
+    {
+        // Para navegación externa
+        NavigationManager.NavigateTo(url, true);
+
+        // O para navegación interna de tu app
+        //NavigationManager.NavigateTo($"/acceso-usuario");
+
+        CloseApps();
+    }
+    private void ToggleApps()
+    {
+        _showApps = !_showApps;
+    }
+
+    private void CloseApps()
+    {
+        _showApps = false;
+    }
+
+    private async Task ShowInlineDialog()
+    {
+        var result = await _dialogService.OpenAsync<DialogInformacionGeneral>(
+             $"Sobre horarios"
+        );
+        StateHasChanged();
+    }
+    private void OnClick(string text)
+    {
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "RadzenFAB Clicked", Detail = text });
+    }
+}

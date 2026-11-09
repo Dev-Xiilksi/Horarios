@@ -1,0 +1,172 @@
+﻿@using System.Globalization
+@using DocumentFormat.OpenXml.Drawing.Charts
+@using SistemaHorarioApp.Components.Charts.Donuts
+@inject IDataToChartsService _dataToChar
+
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="JustifyContent.Normal">
+    <RadzenCard>
+        <h5>Distribución por area</h5>
+        <p style="font-weight:300;font-size:0.8rem">Sociales</p>
+        <HomeDonutChart totalHorasLectivas="@Math.Round(TotalHorasLectivas, 2)" totalHorasNoLectivas="@Math.Round(TotalHorasNoLectivas, 2)" />
+    </RadzenCard>
+    <RadzenCard>
+        <p><h6>Distribución por educador</h6></p>
+        <p style="font-weight:300;font-size:0.8rem">Veliz Jennifer Eunice</p>
+        <HomeDonutChart totalHorasLectivas="@Math.Round(TotalHorasLectivasEducador, 2)" totalHorasNoLectivas="@Math.Round(TotalHorasNoLectivasEducador, 2)" />
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    [Parameter]
+    public int area { get; set; }
+    [Parameter]
+    public int idEducator { get; set; }
+
+
+    private string ciclo = DateTime.Now.Year.ToString();
+    public double TotalHorasLectivas { get; set; }
+    public double TotalHorasNoLectivas { get; set; }
+
+    public double TotalHorasLectivasEducador { get; set; }
+    public double TotalHorasNoLectivasEducador { get; set; }
+
+    double maxWidth = 0;
+    double categoryGap = 0;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerConsolidadoPorArea();
+        await ObtenerConsolidadoPorEducador();
+    }
+
+
+    class DataItem
+    {
+        public string Quarter { get; set; }
+        public double Revenue { get; set; }
+    }
+
+    string FormatAsUSD(object value)
+    {
+        return ((double)value).ToString("C0", CultureInfo.CreateSpecificCulture("es"));
+    }
+
+    private DataItem[] Valor1 => new DataItem[] {
+        new DataItem
+        {
+            Quarter = "Computacion",
+            Revenue = TotalHorasLectivas
+        },
+        new DataItem
+        {
+            Quarter = "Educador",
+            Revenue = TotalHorasNoLectivasEducador
+        },
+    };
+
+    private DataItem[] Valor2 => new DataItem[] {
+        new DataItem
+        {
+            Quarter = "Educador",
+            Revenue = TotalHorasLectivasEducador
+        },
+
+        new DataItem
+        {
+            Quarter = "Computacion",
+            Revenue = TotalHorasNoLectivas
+        },
+
+    };
+
+
+    /*
+     * Calcular hl y hnl del educador
+     */
+    private async Task ObtenerConsolidadoPorEducador()
+    {
+        var obj = await _dataToChar.OnlyHours(idEducator.ToString());
+        
+        List<TimeSpan> hl = new();
+        List<TimeSpan> hnl = new();
+
+        foreach (var item in obj)
+        {
+            hl.Add(TimeSpan.Parse(item.Ia));
+            hl.Add(TimeSpan.Parse(item.Fmagis));
+
+            hnl.Add(TimeSpan.Parse(item.Aaa));
+            hnl.Add(TimeSpan.Parse(item.Alm));
+            hnl.Add(TimeSpan.Parse(item.Cuida));
+            hnl.Add(TimeSpan.Parse(item.Gaa));
+            hnl.Add(TimeSpan.Parse(item.Gao));
+            hnl.Add(TimeSpan.Parse(item.Ora));
+            hnl.Add(TimeSpan.Parse(item.Rarea));
+            hnl.Add(TimeSpan.Parse(item.Rcomuni));
+            hnl.Add(TimeSpan.Parse(item.Rorient));
+            hnl.Add(TimeSpan.Parse(item.Rpersonal));
+            hnl.Add(TimeSpan.Parse(item.Rtp));
+            hnl.Add(TimeSpan.Parse(item.Anp));
+        }
+
+        TimeSpan totalHorasLectivas = hl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        TimeSpan totalHorasNoLectivas = hnl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        var HorasLectivas = TimeSpan.FromMinutes(totalHorasLectivas.TotalHours);
+        var HorasNoLectivas = TimeSpan.FromMinutes(totalHorasNoLectivas.TotalHours);
+
+        TimeSpan total = HorasLectivas + HorasNoLectivas;
+
+        TotalHorasLectivasEducador = Math.Round(HorasLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+        TotalHorasNoLectivasEducador = Math.Round(HorasNoLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+
+        Console.Write(TotalHorasLectivasEducador);   //17.28
+        Console.Write(TotalHorasNoLectivasEducador); //82.72
+    }
+
+    /*
+     * Proceso para obtener los porcentaje no lectivos y lectivos de un arae especifica
+     */
+    private async Task ObtenerConsolidadoPorArea()
+    {
+
+        var obj = await _dataToChar.OnlyHoursByArea(area.ToString());
+        List<TimeSpan> hl = new();
+        List<TimeSpan> hnl = new();
+
+        foreach (var item in obj)
+        {
+            hl.Add(TimeSpan.Parse(item.Ia));
+            hl.Add(TimeSpan.Parse(item.Fmagis));
+
+            hnl.Add(TimeSpan.Parse(item.Aaa));
+            hnl.Add(TimeSpan.Parse(item.Alm));
+            hnl.Add(TimeSpan.Parse(item.Cuida));
+            hnl.Add(TimeSpan.Parse(item.Gaa));
+            hnl.Add(TimeSpan.Parse(item.Gao));
+            hnl.Add(TimeSpan.Parse(item.Ora));
+            hnl.Add(TimeSpan.Parse(item.Rarea));
+            hnl.Add(TimeSpan.Parse(item.Rcomuni));
+            hnl.Add(TimeSpan.Parse(item.Rorient));
+            hnl.Add(TimeSpan.Parse(item.Rpersonal));
+            hnl.Add(TimeSpan.Parse(item.Rtp));
+            hnl.Add(TimeSpan.Parse(item.Anp));
+        }
+
+        TimeSpan totalHorasLectivas = hl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        TimeSpan totalHorasNoLectivas = hnl.Aggregate(TimeSpan.Zero, (a, b) => a + b);
+        var HorasLectivas = TimeSpan.FromMinutes(totalHorasLectivas.TotalHours);
+        var HorasNoLectivas = TimeSpan.FromMinutes(totalHorasNoLectivas.TotalHours);
+
+        TimeSpan total = HorasLectivas + HorasNoLectivas;
+
+        TotalHorasLectivas = Math.Round(HorasLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+        TotalHorasNoLectivas = Math.Round(HorasNoLectivas.TotalMinutes / total.TotalMinutes * 100, 2);
+
+        Console.Write(TotalHorasLectivas);   //17.28
+        Console.Write(TotalHorasNoLectivas); //82.72
+    }
+    
+
+}

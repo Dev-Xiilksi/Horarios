@@ -1,0 +1,101 @@
+﻿/* ---------- Foto del empleado ---------- */
+.photo-employee {
+    height: 170px;
+    width: 120px;
+    flex-shrink: 0;
+}
+
+.photo-employee-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 1px solid #cecece;
+}
+
+/* ---------- Grid de tarjetas resumen ---------- */
+/* auto-fit + minmax: se acomodan solas según el ancho disponible,
+       sin necesidad de breakpoints manuales por columna */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+::deep .summary-card {
+    text-align: center;
+    padding: 1rem;
+    min-height: 110px;
+    max-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+::deep .ssummary-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 110px;
+    max-height: 110px;
+    overflow:hidden;
+}
+
+::deep .summary-label {
+    color: #5C5759;
+    font-weight: 300;
+    font-size: 1.05rem;
+}
+::deep .summary-icon-label {
+    color: #5C5759;
+}
+::deep .summary-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.container-admin {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.5rem;
+}
+/* ---------- Tabla: scroll horizontal en pantallas chicas ---------- */
+::deep .grid-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ---------- Ajustes específicos para móvil ---------- */
+@media (max-width: 600px) {
+    .header-stack {
+        justify-content: center !important;
+        text-align: center;
+    }
+
+    .photo-employee {
+        height: 120px;
+        width: 90px;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary-value {
+        font-size: 1.25rem;
+    }
+    .container-admin {
+        grid-template-columns: 2fr;
+        width: 100px;
+    }
+}
+
+@media (max-width: 360px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+    .container-admin {
+        grid-template-columns: 1fr;
+        width:100px;
+    }
+}

@@ -1,0 +1,188 @@
+﻿@page "/acceso-usuario"
+@attribute [Authorize(Roles = RolesSistema.Administrador)]
+@using Microsoft.AspNetCore.Authorization
+@* @using Radzen.Blazor.Rendering *@
+@using SistemaHorarioApp.Dialog@* ESTE ES IMPORTANTE PARA ABRIR DIALOGS *@
+@inject DialogService _dialogService
+@inject IAccesoUsuarioService _accesoUsuario
+@* SweetAlert *@
+@inject SweetAlertService _swal
+@* para notificaciones *@
+@* @inject IToastService _toastService *@
+
+<RadzenCard>
+    <h2>Acceso a usuario</h2>
+    <h6 style="font-weight:200; color:#676774;">Ingreso de usuarios al sitio.</h6>
+    <div class="mb-3 d-heaader">
+        <div class="mb-3">
+            <RadzenButton Style="background-color:#CC1243;font-weight: bolder;font-size: 0.7rem;" Click="@(() => OpenDialog(null))" Text="Agregar colaborador" />
+        </div>
+    </div>
+    <div class="mb-3">
+        <input type="text"
+               class="form-control"
+               placeholder="Buscar..."
+               @bind="searchTerm"
+               @bind:event="oninput"
+               @onkeyup="FilterProducts" />
+    </div>
+    @if (filteredaccesos == null)
+    {
+        <p><em>Cargando...</em></p>
+    }
+    else if (!filteredaccesos.Any())
+    {
+        <p><em>No se encontraron registros.</em></p>
+    }
+    else
+    {
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th> </th>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Rol</th>
+                    <th>Area</th>
+                    <th>_</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in filteredaccesos)
+                {
+                    <tr>
+                        <td>
+                            <div class="photo-emplyee" style="height:50px;width:49px;">
+                                <img src="@($"/employees/{item.IdEmpleado}.jpg")" alt="Logo"
+                                     onerror="this.src='/employees/profile-picture.png'"
+                                     style="width:100%;height:100%; border-radius:70%; border:1px solid #cecece;" />
+                                <div class="dropdown-content">
+                                    <img src="@($"/employees/{item.IdEmpleado}.jpg")" alt=@item.FullName
+                                         onerror="this.src='/employees/profile-picture.png'"
+                                         width="200" height="300">
+                                    <div class="desc">@item.FullName</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>@item.IdEmpleado</td>
+                        <td>@item.FullName</td>
+                        <td>@item.RolName</td>
+                        <td>@item.AreaName</td>
+                        <td>
+                            <RadzenButton Icon="edit"
+                                          ButtonStyle="ButtonStyle.Light"
+                                          Click="@(() => OpenDialog(item))" />
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Warning"
+                                          Click="@(() => EliminarUsuario(item.IdEmpleado))" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <p class="text-muted">Mostrando @filteredaccesos.Count() de @accesos.Count() Accesos</p>
+    }
+</RadzenCard>
+
+    @code {
+    List<AccesoUsuarioDTO> accesos = new List<AccesoUsuarioDTO>();
+    List<AccesoUsuarioDTO> filteredaccesos = new List<AccesoUsuarioDTO>();
+    private string searchTerm = string.Empty;
+
+    IList<AccesoUsuarioDTO> seleccionarAcceso;
+    private string imagePath = $"/employees/1634.png";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        var task = new List<Task>
+        {
+            ObtenerAccesos(),
+        };
+
+        await Task.WhenAll(task);
+        filteredaccesos = accesos;
+    }
+
+    private async Task ObtenerAccesos()
+    {
+        try
+        {
+            var response = await _accesoUsuario.GetAll();
+            if (response.Any())
+            {
+                accesos = response;
+                filteredaccesos = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            accesos = new List<AccesoUsuarioDTO>();
+        }
+    }
+
+    private void FilterProducts()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredaccesos = accesos;
+        }
+        else
+        {
+            filteredaccesos = accesos.Where(p =>
+                p.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                p.RolName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                p.IdEmpleado.ToString().Contains(searchTerm)
+            ).ToList();
+        }
+    }
+
+    public async Task OpenDialog(AccesoUsuarioDTO? access)
+    {
+        var result = await _dialogService.OpenAsync<RegistroAcceso>(
+            "Acceso a usuarios",
+        new Dictionary<string, object>() { { "access", access } },
+            new DialogOptions { Width = "800px", Height = "500px" });
+        await ObtenerAccesos();
+        StateHasChanged();
+    }
+
+    private async Task EliminarUsuario(int id)
+    {
+        // Mostrar confirmación antes de eliminar
+        var confirm = await _swal.FireAsync(new SweetAlertOptions
+        {
+            Title = "¿Está seguro?",
+            Text = $"Esta acción eliminará el acceso al usuario {id} seleccionado.",
+            Icon = SweetAlertIcon.Warning,
+            ShowCancelButton = true,
+            ConfirmButtonText = "Sí, eliminar",
+            CancelButtonText = "Cancelar"
+        });
+
+        // Si el usuario cancela, no continúa
+        if (confirm.Dismiss == DismissReason.Cancel)
+            return;
+
+        try
+        {
+            var response = await _accesoUsuario.Delete(id);
+
+            if (response)
+            {
+                await _swal.FireAsync("Eliminado","Horario eliminado correctamente.", SweetAlertIcon.Success);
+                await ObtenerAccesos();
+            }
+            else
+            {
+                await _swal.FireAsync("Error","No se pudo eliminar el acceso.", SweetAlertIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("Error", $"Ocurrió un error al eliminar: {ex.Message}", SweetAlertIcon.Error);
+        }
+    }
+}

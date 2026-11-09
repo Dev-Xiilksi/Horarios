@@ -1,0 +1,31 @@
+﻿
+<RadzenStack AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center"
+             Style="width:100%; height:100%;">
+    <RadzenChart Style="width:100%; height:200px; ">
+        <RadzenChartTooltip />
+        <RadzenDonutSeries Data="@revenue" CategoryProperty="Category" ValueProperty="Value" Title="">
+            <RadzenSeriesDataLabels Visible="false" />
+        </RadzenDonutSeries>
+        <RadzenLegend Visible="true" Position="LegendPosition.Right" />
+    </RadzenChart>
+</RadzenStack>
+
+@code {
+
+    [Parameter]
+    public double totalHorasLectivas { get; set; }
+    [Parameter]
+    public double totalHorasNoLectivas { get; set; }
+
+
+    class DataItem
+    {
+        public string Category { get; set; }
+        public double Value { get; set; }
+    }
+    private DataItem[] revenue => new DataItem[]
+        {
+            new DataItem { Category = $"Horas Lectivas {totalHorasLectivas}%", Value = totalHorasLectivas },
+            new DataItem { Category = $"Horas No Lectivas {totalHorasNoLectivas}%", Value = totalHorasNoLectivas },
+        };
+}

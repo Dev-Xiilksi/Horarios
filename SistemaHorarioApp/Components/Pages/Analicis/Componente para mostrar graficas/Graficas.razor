@@ -1,0 +1,123 @@
+﻿@page "/area/{Codigo}/{id}/{ciclo}"
+@using System.Threading.Tasks
+@using System.Globalization
+
+@inject IJSRuntime js;
+
+@inject IAccesoUsuarioService _accesoServ
+@inject ISender _sender
+@inject NavigationManager _nav
+<style>
+    /* Previene el scroll general de la página */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+</style>
+<div class="page-container">
+    <RadzenCard Variant="@variant" Style="flex: 1; overflow-y: auto; margin: 0;background-color:#fff;">
+        <h2>@areaName</h2>
+        <div>
+            <div class="main-content">
+                <div class="left-section">
+                    <div class="cards-section">
+                        <div class="cards-row">
+                            <RadzenCard Variant="@variant" class="rz-my-3" Style="max-width: 450px">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Start" Gap="1rem" class="rz-p-2">
+                                    <div class="photo-emplyee" style="max-height:169px;max-width:145px;">
+                                        @* <div class="avatar-badge"></div> *@
+                                    </div>
+                                    <RadzenStack Gap="0">
+                                        <RadzenText TextStyle="TextStyle.Body1"><b>@((areaName))</b></RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body1" class="rz-display-flex rz-mt-2 rz-my-1">@ciclo</RadzenText>
+                                        
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </div>
+                    </div>
+                    <div class="transactions">
+                        @foreach (var item in filtered)
+                        {
+                            <div class="card">
+                                <div class="card-content">
+                                    <div class="account-info">
+                                        <h3>@item.NombreEmpleado</h3>
+                                        <div class="plan-badge">
+                                            <span class="plan-icon">
+                                                <img src="@($"/employees/{item.Empleado}.png")" alt=@item.NombreEmpleado
+                                                     onerror="this.src='/employees/profile-picture.png'"
+                                                     style="width:100%;height:100%; border-radius:70%; border:1px solid #cecece;" />
+                                            </span>
+                                            <span style="color:#CC1243;">@item.Empleado</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button class="btn-options">⋮</button>
+                                        <RadzenButton Style="background-color: #CC1243; color:#fff; font-weight:300;" Text="Ver analicis" Click="() => Goto(item.Empleado)" />
+                                        @* <button class="btn-active" Click="() => Goto(item.Empleado)">Active</button> *@
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    // [Parameter]
+    // public int employee { get; set; }
+    [Parameter]
+    public string Codigo { get; set; }
+    [Parameter]
+    public string id { get; set; }
+    [Parameter]
+    public string ciclo { get; set; }
+
+    Variant variant = Variant.Outlined;
+    //public string ciclo = DateTime.Now.Year.ToString();
+    private string areaName = "No hay datos para mostrar";
+
+    /******Lists******/
+    private List<HrHorario1DTO> data = new List<HrHorario1DTO>();
+    private List<HrHorario1DTO> filtered = new List<HrHorario1DTO>();
+    private List<AreaDTO> areas = new List<AreaDTO>();
+
+    AccesoUsuarioDTO access = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerHorarios();
+    }
+
+    /******Carga los datos del educadores por area******/
+    private async Task ObtenerHorarios()
+    {
+        try
+        {
+            var response = await _sender.Send(new ObtenerHorariosQuery(ciclo));
+            if (response.Any())
+            {
+                data = response.Where(a => a.Area == Convert.ToInt32(id)).ToList() ?? new List<HrHorario1DTO>();
+                //await _jsruntime.InvokeVoidAsync("console.log", response);
+                filtered = data;
+                areaName = data.Select(a => a.NombreArea).First().ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            data = new List<HrHorario1DTO>();
+        }
+    }
+    private void Goto(int? Empleado)
+    {
+        string employee = Empleado.ToString()!;
+        _nav.NavigateTo($"/Educadores/DataProfile/{employee}");
+    }
+}

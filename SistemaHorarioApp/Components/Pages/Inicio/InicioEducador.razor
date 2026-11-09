@@ -1,0 +1,158 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject IReporteService _reportesService
+@inject IExcelHorarioService _excelHorarioService
+@inject ISender _sender
+@inject IListadoHorarioColaboradorService _listadoHC
+@inject IJSRuntime _jsruntime
+@inject NavigationManager _nav
+@inject SweetAlertService _swal
+@inject AuthenticationStateProvider AuthProvider
+<div class="rz-p-0">
+    
+    <RadzenCard Variant="@variant" class="rz-my-1" Style="max-width: 420px;">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Start" Gap="1rem" class="rz-p-0">
+            <RadzenImage Path="@($"/employees/{idEmpleado}.jpg")"
+                         Style="width: 50px; height: 70px; flex-shrink:0;"
+                         class="rz-border-radius-2"
+                         AlternateText="@(idEmpleado)" />
+            <RadzenStack Gap="0">
+                <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-1 rz-my-0">@nombreArea, @nombreRol</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2"><b>@(nombreUsuario) @((idEmpleado))</b></RadzenText>
+                <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-4 rz-mb-0">@textoConfirmar</RadzenText>
+
+                <RadzenCard class="rz-shadow-0 rz-border-radius-0 rz-p-0" Visible="esVisible" Variant="@variant" style="margin: 1rem calc(-1 * var(--rz-card-padding));">
+                    <RadzenRow RowGap="0">
+                        <RadzenColumn SizeSM="4">
+                            <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Text="@(colaborador.FechaRegistro)" Size="ChipSize.Small"
+                                        Variant="Variant.Outlined" Style="color:#fff; border:1px solid #CC1243; background:#CC1243;" />
+                        </RadzenColumn>
+                        <RadzenColumn SizeSM="5">
+                            <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Text="@(tipoFranja)" Size="ChipSize.Small"
+                                        Variant="Variant.Outlined" Style="color:#fff; border:1px solid #CC1243; background:#CC1243;" />
+                        </RadzenColumn>
+                        <RadzenColumn SizeSM="3">
+                            @if (esAprobado)
+                            {
+                                <RadzenChip class=" rz-display-flex rz-mt-0 rz-mb-1" Size="ChipSize.Small"
+                                            Text="Aprobado" ChipStyle="BadgeStyle.Success" />
+                            }
+
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenCard>
+
+            </RadzenStack>
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0" Visible="esVisible">
+            <RadzenButton Variant="Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Eliminar Horario" Click="() => Eliminar(idEmpleado)" />
+            <RadzenButton Variant="Variant.Text" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.ExtraSmall" Text="Excel" Click="() => DescargarExcel(Convert.ToInt32(idEmpleado))" />
+        </RadzenStack>
+    </RadzenCard>
+
+
+</div>
+
+@code {
+    Variant variant = Variant.Flat;
+    private string ciclo = DateTime.Now.Year.ToString();
+
+    private string idEmpleado = "0";
+    private string nombreUsuario = "";
+    private string nombreArea = "";
+    private string nombreRol = "";
+    private string textoConfirmar = "";
+    private string tituloMensaje = "Ingresado";
+    private string tipoFranja = "";
+    private int codigo = 0;
+    private bool esVisible = false;
+    private bool esAprobado = false;
+
+    ColaboradorDTO colaborador = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var obj = await AuthProvider.GetAuthenticationStateAsync();
+        var educadorLogeado = obj.User;
+        nombreUsuario = educadorLogeado.Identity!.Name!;
+        idEmpleado = educadorLogeado.FindFirst("idUser")?.Value;
+        nombreArea = educadorLogeado.FindFirst("area")?.Value;
+        nombreRol = educadorLogeado.FindFirst(ClaimTypes.Role)?.Value;
+
+        await GetHours();
+    }
+
+    /******Obtiene el horario del educador logeado, sirve para mostrarle si el educador posee o no datos ya ingresados******/
+    private async Task GetHours()
+    {
+        var response = await _listadoHC.Colaborador(Convert.ToInt32(idEmpleado));
+        esAprobado = response.Any(a => a.Idconfirmacion == 1);
+
+        tipoFranja = response.Select(a => a.TipoFranja).FirstOrDefault();
+        // icon = isConfirm ? "done_all" : "check_small";
+        tituloMensaje = esAprobado ? "Aprobado por coordinador" : "Ingresado";
+        if (response.Any())
+        {
+            colaborador = response.FirstOrDefault();
+            esVisible = true;
+            textoConfirmar = "Has ingresado registro de horario";
+        }
+    }
+    private async Task DescargarExcel(int codigo)
+    {
+        try
+        {
+            //var idEmpleado = Convert.ToInt32(codigo);
+            var horario = await _reportesService.ObtenerExcel(codigo);
+
+            byte[] excel = _excelHorarioService.GenerarExcel(horario);
+
+            var nombreArchivo = $"Horario_{codigo}_{ciclo}_.xlsx";
+            var base64 = Convert.ToBase64String(excel);
+
+            await _jsruntime.InvokeVoidAsync("downloadFileFromBytes", nombreArchivo, base64);
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+    }
+
+    private async Task Eliminar(string codigo)
+    {
+        // Mostrar confirmación antes de eliminar
+        var confirm = await _swal.FireAsync(new SweetAlertOptions
+        {
+            Title = "¿Está seguro?",
+            Text = $"Esta acción eliminará el horario del ciclo {ciclo} y no se podrá recuperar.",
+            Icon = SweetAlertIcon.Warning,
+            ShowCancelButton = true,
+            ConfirmButtonText = "Sí, eliminar",
+            CancelButtonText = "Cancelar"
+        });
+
+        // Si el usuario cancela, no continúa
+        if (confirm.Dismiss == DismissReason.Cancel)
+            return;
+
+        try
+        {
+            var response = await _sender.Send(new EliminarHorarioCommand(Convert.ToInt16(codigo)));
+
+            if (response.status)
+            {
+                await _swal.FireAsync("Eliminado", response.message ?? "Horario eliminado correctamente.", SweetAlertIcon.Success);
+                _nav.NavigateTo("/page/home", forceLoad: true);
+            }
+            else
+            {
+                await _swal.FireAsync("", response?.message ?? response.message, SweetAlertIcon.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            await _swal.FireAsync("Error", $"Ocurrió un error al eliminar: {ex.Message}", SweetAlertIcon.Error);
+        }
+    }
+}

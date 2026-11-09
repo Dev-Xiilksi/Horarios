@@ -1,0 +1,22 @@
+﻿namespace SistemaHorario.Application.DTOs.Auxiliares
+{
+    public class EmployeeProfileDTO
+    {
+        public int IdAcceso { get; set; }
+
+        public int? IdRol { get; set; }
+
+        public int? IdEmpleado { get; set; }
+
+        public short? IdArea { get; set; }
+
+        public virtual AreaDTO? IdAreaNavigation { get; set; }
+
+        public virtual RolDTO? IdRolNavigation { get; set; }
+
+        //aux
+        public string? FullName { get; set; }
+        public virtual string? RolName { get; set; }
+        public string? AreaName { get; set; }
+    }
+}

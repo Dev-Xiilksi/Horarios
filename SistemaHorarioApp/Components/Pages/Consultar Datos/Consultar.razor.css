@@ -1,0 +1,72 @@
+﻿.btn-registrar {
+    font-weight: bolder;
+    font-size: 0.7rem;
+    color: #fff;
+    border: none;
+    background-color: #CC1243;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    padding-left: 20px;
+    padding-right: 20px;
+    margin: 1px;
+
+    span {
+        font-size: 0.2rem;
+    }
+}
+
+
+th {
+    color: white;
+    font-weight: 200;
+}
+
+.d-heaader {
+    display: flex;
+    justify-content: end;
+}
+
+
+/* Contenedor principal de la tabla */
+.table-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.table td {
+    max-width: 100px;
+}
+
+
+.border {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+.header-table {
+    text-align: start;
+    font-size: 11px;
+    color: #424242;
+    font-weight: bold;
+}
+.td-table {
+    text-align: center;
+    font-size: 12px;
+}
+.highlight-hl {
+    background-color: #B3EBCD; /* verde suave */
+}
+
+.highlight-nhl {
+    background-color: #F7CECD; /* rojo suave */
+}
+@media (max-width:600px) {
+    /* Forzar ancho fijo en las celdas */
+    .table td {
+        max-width: 200px;
+        min-width: 150px;
+    }
+}

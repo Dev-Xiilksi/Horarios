@@ -1,0 +1,120 @@
+﻿@using System.Globalization
+@inject IDataToChartsService _dataChartServ
+@inject IJSRuntime _js
+
+<RadzenChart Style="height:400px">
+    <RadzenChartTooltip />
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de AAA" ValueProperty="AAA">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de ALM" ValueProperty="ALM">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de ORA" ValueProperty="ORA">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de GAA" ValueProperty="GAA">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de GAO" ValueProperty="GAO">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de Cuida" ValueProperty="Cuida">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenStackedColumnSeries Data="@data" CategoryProperty="Empleado"
+                               Title="Promedio de RTP" ValueProperty="RTP">
+        <RadzenSeriesDataLabels Visible="true" />
+    </RadzenStackedColumnSeries>
+
+    <RadzenValueAxis Formatter="@FormatAsHHMM" Min="0">
+        <RadzenGridLines Visible="true" />
+        <RadzenAxisTitle Text="Horas" />
+    </RadzenValueAxis>
+
+</RadzenChart>
+
+@code {
+    [Parameter]
+    public string? employee { get; set; }
+
+    private HorarioAuxDTO hourEducator = new();
+
+    DataItem[] data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetHourByEducator();
+
+        data = new[]
+        {
+            new DataItem
+            {
+                Empleado = "",
+
+                // SAA   = ToHours(hourEducator.Saa),
+                AAA   = ToHours(hourEducator.Aaa),
+                ALM   = ToHours(hourEducator.Alm),
+                ORA   = ToHours(hourEducator.Ora),
+                GAA   = ToHours(hourEducator.Gaa),
+                GAO   = ToHours(hourEducator.Gao),
+                Cuida = ToHours(hourEducator.Cuida),
+                RTP   = ToHours(hourEducator.Rtp)
+            }
+        };
+    }
+
+    class DataItem
+    {
+        public string Empleado { get; set; } = string.Empty;
+
+        public double SAA { get; set; }
+        public double AAA { get; set; }
+        public double ALM { get; set; }
+        public double ORA { get; set; }
+        public double GAA { get; set; }
+        public double GAO { get; set; }
+        public double Cuida { get; set; }
+        public double RTP { get; set; }
+    }
+
+    private double ToHours(string hhmmss)
+    {
+        return TimeSpan.Parse(hhmmss).TotalHours;
+    }
+    //To axis to chart
+    private string FormatAsHHMM(object value)
+    {
+        var ts = TimeSpan.FromHours((double)value);
+        return $"{(int)ts.TotalHours}:{ts.Minutes:00}";
+    }
+
+    private async Task GetHourByEducator()
+    {
+        try
+        {
+            var response = await _dataChartServ.GetHour(employee!);
+
+            hourEducator = response;
+            await _js.InvokeVoidAsync("console.log", hourEducator);
+            
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            hourEducator = new HorarioAuxDTO();
+        }
+    }
+}

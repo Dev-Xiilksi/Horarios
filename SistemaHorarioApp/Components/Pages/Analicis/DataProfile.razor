@@ -1,0 +1,178 @@
+﻿@page "/Educadores/DataProfile/{Empleado}"
+@attribute [Authorize(Roles = RolesSistema.Administrador)]
+@using System.Threading.Tasks
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@using SistemaHorarioApp.Components.Pages.Analicis.Analicis
+@using SistemaHorarioApp.Components.Pages.Analicis.Donut_chart
+@inject IJSRuntime js;
+@inject IEmployeeProfileService _profile
+@inject IDataToChartsService _dataChartServ
+@inject SweetAlertService _sw
+<style>
+    /* Previene el scroll general de la página */
+    html, body {
+        overflow: hidden;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+</style>
+<div class="page-container">
+    <RadzenCard Variant="@variant" Style="flex: 1; overflow-y: auto; margin: 0;background-color:#fff;">
+        <h2>Datos de horario de educador</h2>
+        <div>
+            <div class="main-content">
+                <div class="left-section">
+                    <div class="cards-section">
+                        <div class="cards-row">
+                            <RadzenCard Variant="@variant" class="rz-my-3" Style="max-width: 450px">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.Start" Gap="1rem" class="rz-p-2">
+
+                                    <div class="photo-emplyee" style="max-height:169px;max-width:145px;">
+                                        <img src="@($"/employees/{@Empleado}.jpg")" alt=@Empleado
+                                             onerror="this.src='/employees/user.png'"
+                                             style="width:100%;height:100%; border:1px solid #fff;" />
+                                    </div>
+                                    <RadzenStack Gap="0">
+                                        <RadzenText TextStyle="TextStyle.Overline" class="rz-display-flex rz-mt-2 rz-my-1">@profile.AreaName, @profile.RolName</RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body1"><b>@(profile.FullName)</b></RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body1"><b>@((Empleado))</b></RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Body1"><b>@(x)</b></RadzenText>
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </div>
+                    </div>
+
+                    <div class="transactions">
+
+                        <RadzenTabs @bind-SelectedIndex=@selectedIndex>
+                            <Tabs>
+                                <RadzenTabsItem Text="Analisis 1">
+                                    <Analitics01 employee="@Empleado" />
+                                </RadzenTabsItem>
+                                <RadzenTabsItem Text="Analisis 2">
+                                    <Analitics02 employee="@Empleado" />
+                                </RadzenTabsItem>
+                            </Tabs>
+                        </RadzenTabs>
+
+                    </div>
+                </div>
+
+                @* To donut graphic *@
+                <div class="right-section ">
+                    <RadzenCard Variant="@variant" style="height:350px;" class="donut-radzen">
+                        <h4>Distribución de horas trabajadas</h4>
+                        <div>
+                            <DonutChart employee="@Empleado" />
+                        </div>
+                    </RadzenCard>
+
+                    <RadzenCard Variant="@variant">
+                        <div class="transactions-list">
+                            @if (obj != null)
+                            {
+                                @foreach (var item in obj)
+                                {
+                                    <div class="transaction-mini">
+                                        <div class="mini-left">
+                                            <div class="mini-icon" style="background: #fff;">•</div>
+                                            <div class="mini-info">
+                                                <span>@item.Key</span>
+                                            </div>
+                                        </div>
+                                        <div class="mini-amount">@item.Value</div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="transaction-mini">
+                                    <div class="mini-left">
+                                        <div class="mini-icon" style="background: #fff;">•</div>
+                                        <div class="mini-info">
+                                            <h5>Cargando datos...</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </RadzenCard>
+
+                </div>
+            </div>
+        </div>
+    </RadzenCard>
+</div>
+
+@code {
+    [Parameter]
+    public string? Empleado { get; set; }
+
+    Variant variant = Variant.Outlined;
+    private string x = "";
+    int selectedIndex = 0;
+
+    private EmployeeProfileDTO profile = new();
+    private HorarioAuxDTO? hourData { get; set; }
+    Dictionary<string, object>? obj { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        await GetProfile();
+        await GetHourByEducator();
+    }
+
+    //To get employee's profile
+    private async Task GetProfile()
+    {
+        try
+        {
+            var response = await _profile.Get(Empleado.ToString()!);
+            if (response.IdEmpleado > 0)
+            {
+                profile = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            profile = new EmployeeProfileDTO();
+            await _sw.FireAsync("!Error!", ex.Message, SweetAlertIcon.Success);
+        }
+    }
+
+    //To get all employee's hours
+    private async Task GetHourByEducator()
+    {
+        try
+        {
+            var response = await _dataChartServ.GetHour(Empleado!);
+            hourData = response;
+
+            obj = new Dictionary<string, object>()
+                {
+                    {"REVISA TRABAJOS Y PLANIFICA - TRABAJO PERSONAL", hourData.Rtp},
+                    {"CUIDA RECREO O SALIDA", hourData.Cuida},
+                    {"REUNIÓN PERSONAL COORDINADOR", hourData.Rpersonal},
+                    {"REUNIÓN COORDINADOR O ÁREA", hourData.Rarea},
+                    {"REUNIÓN COMUNIDAD APRENDIZAJE", hourData.Rcomuni},
+                    {"REUNIÓN CON ORIENTADOR/A", hourData.Rorient},
+                    {"FRANJA MAGIS", hourData.Fmagis},
+                    {"GESTIÓN DE ACTIVIDADES DE ORIENTACIÓN", hourData.Gao},
+                    {"GESTIÓN DE ACTIVIDADES DE ACOMPAÑAMIENTO", hourData.Gaa},
+                    {"ORACIÓN", hourData.Ora},
+                    {"ALMUERZO / REFACCIÓN", hourData.Alm},
+                    {"Actividades de autocuidado y aprecio personal", hourData.Aaa}
+                };
+            StateHasChanged(); // le indica al framewor que el componente ha cambiado y que la ui debe actualizarse
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            hourData = new HorarioAuxDTO();
+        }
+    }
+
+}
